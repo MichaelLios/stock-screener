@@ -4,6 +4,39 @@ A stock screening and analysis platform with real-time market data from Yahoo Fi
 
 ![Python](https://img.shields.io/badge/Python-3.8+-blue) ![React](https://img.shields.io/badge/React-19-61dafb) ![FastAPI](https://img.shields.io/badge/FastAPI-0.128-009688) ![Vite](https://img.shields.io/badge/Vite-7-646cff)
 
+# Stock Screener
+
+A full-stack stock screener web application built to analyze equities using fundamental financial metrics and real-time market data.
+
+## Features
+- Screen stocks by price, market capitalization, volume, P/E ratio, dividend yield, and sector
+- View real-time stock quotes
+- Access company fundamentals and financial statement data
+- Read recent stock-specific news
+- Search stocks using a directory of symbols and company names
+
+## Tech Stack
+- Frontend: React, Vite
+- Backend: FastAPI, Python
+- Data Source: yfinance
+- Other Tools: pandas, dotenv
+
+## Project Overview
+This project was built to strengthen my understanding of software development, API design, financial data analysis, and systematic stock screening. The frontend provides a user-friendly interface, while the backend processes requests, retrieves data, and applies filtering logic.
+
+## How It Works
+1. The user interacts with the frontend by entering a stock symbol or screening criteria.
+2. The frontend sends requests to the FastAPI backend in JSON format.
+3. The backend retrieves market and financial data using yfinance.
+4. The backend applies screening logic and returns matching results.
+5. The frontend displays the results, charts, and related company information.
+
+## Running the Project Locally
+
+### Backend
+```bash
+uvicorn main:app --reload
+
 ## Features
 
 - **Stock Search** — Search by symbol or company name with autocomplete (70+ pre-loaded stocks)

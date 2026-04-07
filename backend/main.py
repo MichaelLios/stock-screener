@@ -39,7 +39,7 @@ class ScreenerCriteria(BaseModel):
     max_pe_ratio: Optional[float] = None
     min_dividend_yield: Optional[float] = None
     sector: Optional[str] = None
-
+print("hello")
 class StockSymbol(BaseModel):
     symbol: str
 
