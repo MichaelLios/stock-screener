@@ -1,0 +1,130 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  line-height: 1.6;
+  font-weight: 400;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Dark Theme (default) */
+[data-theme="dark"] {
+  color-scheme: dark;
+  color: rgba(255, 255, 255, 0.9);
+  background-color: #0c0c0f;
+
+  --bg-primary: #0c0c0f;
+  --bg-secondary: #15151a;
+  --bg-tertiary: #1c1c24;
+  --bg-hover: #232330;
+
+  --text-primary: #e8e8e8;
+  --text-secondary: #9a9aa5;
+  --text-muted: #6b6b78;
+
+  --accent-primary: #3b82f6;
+  --accent-hover: #2563eb;
+  --accent-light: #60a5fa;
+
+  --border-color: #2a2a35;
+  --border-hover: #3b3b4a;
+
+  --success: #10b981;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+
+  --skeleton-base: #1c1c24;
+  --skeleton-highlight: #2a2a35;
+}
+
+/* Light Theme */
+[data-theme="light"] {
+  color-scheme: light;
+  color: rgba(0, 0, 0, 0.9);
+  background-color: #f8fafc;
+
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f1f5f9;
+  --bg-hover: #e2e8f0;
+
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+
+  --accent-primary: #3b82f6;
+  --accent-hover: #2563eb;
+  --accent-light: #1d4ed8;
+
+  --border-color: #e2e8f0;
+  --border-hover: #cbd5e1;
+
+  --success: #059669;
+  --danger: #dc2626;
+  --warning: #d97706;
+
+  --skeleton-base: #e2e8f0;
+  --skeleton-highlight: #f1f5f9;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: var(--bg-primary);
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+
+a {
+  font-weight: 500;
+  color: var(--accent-light);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+a:hover {
+  color: var(--accent-primary);
+}
+
+button {
+  font-family: inherit;
+}
+
+input, select, textarea {
+  font-family: inherit;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-hover);
+}
