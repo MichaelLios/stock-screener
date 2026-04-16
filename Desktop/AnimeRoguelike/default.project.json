@@ -1,0 +1,105 @@
+{
+  "name": "AnimeRoguelike",
+  "tree": {
+    "$className": "DataModel",
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "GameManager": {
+        "$path": "src/ServerScriptService/GameManager.server.lua"
+      },
+      "DungeonGenerator": {
+        "$path": "src/ServerScriptService/DungeonGenerator.lua"
+      },
+      "EnemyAI": {
+        "$path": "src/ServerScriptService/EnemyAI.lua"
+      },
+      "CombatSystem": {
+        "$path": "src/ServerScriptService/CombatSystem.lua"
+      },
+      "LootSystem": {
+        "$path": "src/ServerScriptService/LootSystem.lua"
+      },
+      "SpawnSetup": {
+        "$path": "src/ServerScriptService/SpawnSetup.server.lua"
+      },
+      "MetaProgression": {
+        "$path": "src/ServerScriptService/MetaProgression.lua"
+      },
+      "WorldBuilder": {
+        "$path": "src/ServerScriptService/WorldBuilder.server.lua"
+      }
+    },
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "Modules": {
+        "$className": "Folder",
+        "CharacterStats": {
+          "$path": "src/ReplicatedStorage/Modules/CharacterStats.lua"
+        },
+        "AbilitySystem": {
+          "$path": "src/ReplicatedStorage/Modules/AbilitySystem.lua"
+        },
+        "EnemyData": {
+          "$path": "src/ReplicatedStorage/Modules/EnemyData.lua"
+        },
+        "ItemData": {
+          "$path": "src/ReplicatedStorage/Modules/ItemData.lua"
+        },
+        "RoomData": {
+          "$path": "src/ReplicatedStorage/Modules/RoomData.lua"
+        },
+        "DungeonThemes": {
+          "$path": "src/ReplicatedStorage/Modules/DungeonThemes.lua"
+        },
+        "EnemyModifiers": {
+          "$path": "src/ReplicatedStorage/Modules/EnemyModifiers.lua"
+        },
+        "SynergySystem": {
+          "$path": "src/ReplicatedStorage/Modules/SynergySystem.lua"
+        },
+        "AwakeningData": {
+          "$path": "src/ReplicatedStorage/Modules/AwakeningData.lua"
+        }
+      },
+      "RemoteEvents": {
+        "$className": "Folder",
+        "UseAbility":        { "$className": "RemoteEvent" },
+        "TakeDamage":        { "$className": "RemoteEvent" },
+        "UpdateHUD":         { "$className": "RemoteEvent" },
+        "RoomCleared":       { "$className": "RemoteEvent" },
+        "FloorComplete":     { "$className": "RemoteEvent" },
+        "LootDrop":          { "$className": "RemoteEvent" },
+        "PlayerDied":        { "$className": "RemoteEvent" },
+        "SwapAbility":       { "$className": "RemoteEvent" },
+        "EnemyAttack":       { "$className": "RemoteEvent" },
+        "LootChoice":        { "$className": "RemoteEvent" },
+        "PickLoot":          { "$className": "RemoteEvent" },
+        "BossPhase":         { "$className": "RemoteEvent" },
+        "ShrineOpen":        { "$className": "RemoteEvent" },
+        "PickShrine":        { "$className": "RemoteEvent" },
+        "MetaSync":          { "$className": "RemoteEvent" },
+        "MetaUpgrade":       { "$className": "RemoteEvent" },
+        "ActivateAwakening": { "$className": "RemoteEvent" },
+        "AwakeningState":    { "$className": "RemoteEvent" }
+      }
+    },
+    "StarterPlayerScripts": {
+      "$className": "StarterPlayerScripts",
+      "LocalGame": {
+        "$path": "src/StarterPlayerScripts/LocalGame.client.lua"
+      },
+      "AbilityInput": {
+        "$path": "src/StarterPlayerScripts/AbilityInput.client.lua"
+      },
+      "CombatVFX": {
+        "$path": "src/StarterPlayerScripts/CombatVFX.client.lua"
+      }
+    },
+    "StarterGui": {
+      "$className": "StarterGui",
+      "HUD": {
+        "$path": "src/StarterGui/HUD.client.lua"
+      }
+    }
+  }
+}
