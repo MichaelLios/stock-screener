@@ -104,11 +104,13 @@ end
 -- PHYSICAL ROOM BUILDING
 -- ────────────────────────────────────────────────
 
--- Room spacing = tile size so rooms sit directly adjacent; door gaps align.
-local ROOM_SPACING   = 20   -- studs between room centers (must equal TileSize X/Z)
-local WALL_THICKNESS = 2
-local DOOR_WIDTH     = 8    -- opening width (< TileSize so side-walls remain)
-local DOOR_HEIGHT    = 6    -- opening height (< room height so header remains)
+-- Room spacing must equal the TileSize X/Z so doors align between adjacent rooms.
+-- All themes now use 120×24×120 tiles → spacing is 120.
+local ROOM_SPACING        = 120   -- studs between room centers
+local DUNGEON_WORLD_OFFSET = Vector3.new(10000, 100, 0)  -- far from lobby to prevent visual overlap
+local WALL_THICKNESS = 3
+local DOOR_WIDTH     = 22   -- wide enough to dash through comfortably
+local DOOR_HEIGHT    = 16   -- tall enough for jumping / aerial dashes
 
 local function buildFloorPart(parent, size, cframe, color, name)
     local p = Instance.new("Part")
@@ -200,9 +202,9 @@ end
 
 -- roomsMap: { [id] = roomData } so we can look up neighbour positions
 local function buildRoom(folder, roomData, theme, tileSize, roomsMap)
-    local wx = roomData.Position.X * ROOM_SPACING
-    local wz = roomData.Position.Y * ROOM_SPACING
-    local origin = CFrame.new(wx, 0, wz)
+    local wx = roomData.Position.X * ROOM_SPACING + DUNGEON_WORLD_OFFSET.X
+    local wz = roomData.Position.Y * ROOM_SPACING + DUNGEON_WORLD_OFFSET.Z
+    local origin = CFrame.new(wx, DUNGEON_WORLD_OFFSET.Y, wz)
 
     local rw = tileSize.X   -- 20
     local rh = tileSize.Y   -- 8
@@ -241,30 +243,77 @@ local function buildRoom(folder, roomData, theme, tileSize, roomsMap)
     buildZWall(roomFolder, hasDoorW, rd, rh, wt, origin, -rw/2, theme, "WallW")
     buildZWall(roomFolder, hasDoorE, rd, rh, wt, origin,  rw/2, theme, "WallE")
 
-    -- Spawn point
+    -- Spawn point (offset slightly from center so player isn't clipping enemies)
     local spawnPart = Instance.new("Part")
     spawnPart.Name = "SpawnPoint"
     spawnPart.Size = Vector3.new(2, 0.5, 2)
-    spawnPart.CFrame = origin * CFrame.new(0, 0.25, 0)
+    spawnPart.CFrame = origin * CFrame.new(0, 0.25, rd * 0.35)  -- near south door
     spawnPart.Anchored = true
     spawnPart.Transparency = 1
     spawnPart.CanCollide = false
     spawnPart.Parent = roomFolder
 
-    -- Room label
+    -- Room label billboard
     local bg = Instance.new("BillboardGui")
-    bg.Size = UDim2.new(0, 200, 0, 50)
-    bg.StudsOffset = Vector3.new(0, 8, 0)
+    bg.Size = UDim2.new(0, 240, 0, 60)
+    bg.StudsOffset = Vector3.new(0, rh + 4, 0)
     bg.AlwaysOnTop = true
     bg.Parent = spawnPart
     local lbl = Instance.new("TextLabel")
     lbl.Size = UDim2.new(1, 0, 1, 0)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = roomData.Type .. " #" .. roomData.Id
+    lbl.BackgroundTransparency = 0.4
+    lbl.BackgroundColor3 = Color3.fromRGB(5, 5, 15)
+    lbl.Text = roomData.Type .. "  #" .. roomData.Id
     lbl.TextColor3 = theme.AmbientColor
     lbl.TextScaled = true
     lbl.Font = Enum.Font.GothamBold
     lbl.Parent = bg
+
+    -- ── Ambient light in room center ─────────────────────────────────────
+    local lightPart = buildFloorPart(roomFolder,
+        Vector3.new(2, 2, 2),
+        origin * CFrame.new(0, rh - 2, 0),
+        theme.AmbientColor, "CenterLight")
+    lightPart.Material = Enum.Material.Neon
+    lightPart.Transparency = 0.3
+    local pl = Instance.new("PointLight")
+    pl.Color = theme.AmbientColor
+    pl.Brightness = 3
+    pl.Range = rw * 1.2
+    pl.Parent = lightPart
+
+    -- ── Corner pillar columns (give the player things to dash around) ─────
+    local pillarH = rh - 2
+    local pillarW = 4
+    for _, offsets in ipairs({
+        {rw * 0.32, rd * 0.32}, {-rw * 0.32, rd * 0.32},
+        {rw * 0.32, -rd * 0.32}, {-rw * 0.32, -rd * 0.32},
+    }) do
+        local pil = buildFloorPart(roomFolder,
+            Vector3.new(pillarW, pillarH, pillarW),
+            origin * CFrame.new(offsets[1], pillarH / 2, offsets[2]),
+            theme.WallColor, "Pillar")
+        pil.Material = Enum.Material.SmoothPlastic
+        -- Small glow cap on each pillar
+        local cap = buildFloorPart(roomFolder,
+            Vector3.new(pillarW + 1, 1, pillarW + 1),
+            origin * CFrame.new(offsets[1], pillarH + 0.5, offsets[2]),
+            theme.AmbientColor, "PillarCap")
+        cap.Material = Enum.Material.Neon
+        cap.Transparency = 0.5
+    end
+
+    -- ── Low cover blocks scattered around the midfield ────────────────────
+    -- Gives melee/ranged players terrain to use during fights
+    for _, off in ipairs({
+        {rw * 0.18, 0}, {-rw * 0.18, 0},
+        {0, rd * 0.18}, {0, -rd * 0.18},
+    }) do
+        buildFloorPart(roomFolder,
+            Vector3.new(8, 4, 8),
+            origin * CFrame.new(off[1], 2, off[2]),
+            theme.FloorColor, "Cover")
+    end
 
     -- Invisible door-trigger volumes placed in each gap so LocalGame.client.lua
     -- can detect room transitions when the player walks through.
@@ -280,9 +329,12 @@ local function buildRoom(folder, roomData, theme, tileSize, roomsMap)
             elseif dz < -0.5 then triggerCF = origin * CFrame.new(0, DOOR_HEIGHT/2, -rd/2)
             end
             if triggerCF then
+                local isDX = math.abs(dx) > 0.5
                 local doorTrigger = Instance.new("Part")
                 doorTrigger.Name = "Door_To_" .. connId
-                doorTrigger.Size = Vector3.new(DOOR_WIDTH, DOOR_HEIGHT, wt + 2)
+                doorTrigger.Size = isDX
+                    and Vector3.new(wt + 4, DOOR_HEIGHT, DOOR_WIDTH)
+                    or  Vector3.new(DOOR_WIDTH, DOOR_HEIGHT, wt + 4)
                 doorTrigger.CFrame = triggerCF
                 doorTrigger.Anchored = true
                 doorTrigger.Transparency = 1
@@ -296,20 +348,41 @@ local function buildRoom(folder, roomData, theme, tileSize, roomsMap)
         end
     end
 
-    -- Boss door barrier (glowing red wall blocking entrance to boss room)
+    -- Boss door barrier — glowing red wall sealing every door into the boss room.
+    -- Built at each connection so it can't be bypassed from any direction.
     if roomData.Locked then
-        -- Block the north door (first entrance direction found)
-        local barrierZ = -rd/2 + wt
-        local lockBarrier = buildFloorPart(roomFolder,
-            Vector3.new(DOOR_WIDTH, DOOR_HEIGHT, wt),
-            origin * CFrame.new(0, DOOR_HEIGHT/2, barrierZ),
-            Color3.fromRGB(180, 0, 0), "BossDoor")
-        lockBarrier.Material = Enum.Material.Neon
-        lockBarrier.Transparency = 0.4
-        local lockVal = Instance.new("BoolValue")
-        lockVal.Name = "Locked"
-        lockVal.Value = true
-        lockVal.Parent = lockBarrier
+        for _, connId in ipairs(roomData.Connections) do
+            local cr = roomsMap and roomsMap[connId]
+            if cr then
+                local dx = cr.Position.X - roomData.Position.X
+                local dz = cr.Position.Y - roomData.Position.Y
+                local barrierCF
+                if     dx >  0.5 then barrierCF = origin * CFrame.new( rw/2 - wt, DOOR_HEIGHT/2, 0)
+                elseif dx < -0.5 then barrierCF = origin * CFrame.new(-rw/2 + wt, DOOR_HEIGHT/2, 0)
+                elseif dz >  0.5 then barrierCF = origin * CFrame.new(0, DOOR_HEIGHT/2,  rd/2 - wt)
+                elseif dz < -0.5 then barrierCF = origin * CFrame.new(0, DOOR_HEIGHT/2, -rd/2 + wt)
+                end
+                if barrierCF then
+                    local isDX = math.abs(dx) > 0.5
+                    local barrierSize = isDX
+                        and Vector3.new(wt + 1, DOOR_HEIGHT, DOOR_WIDTH)
+                        or  Vector3.new(DOOR_WIDTH, DOOR_HEIGHT, wt + 1)
+                    local lockBarrier = buildFloorPart(roomFolder,
+                        barrierSize, barrierCF,
+                        Color3.fromRGB(200, 0, 0), "BossDoor")
+                    lockBarrier.Material = Enum.Material.Neon
+                    lockBarrier.Transparency = 0.35
+                    local lockVal = Instance.new("BoolValue")
+                    lockVal.Name = "Locked"; lockVal.Value = true
+                    lockVal.Parent = lockBarrier
+                    -- Particle-like glow ring
+                    local gl = Instance.new("PointLight")
+                    gl.Color = Color3.fromRGB(255, 30, 30)
+                    gl.Brightness = 4; gl.Range = 30
+                    gl.Parent = lockBarrier
+                end
+            end
+        end
     end
 
     return roomFolder
@@ -319,10 +392,16 @@ end
 -- PUBLIC API
 -- ────────────────────────────────────────────────
 
-function DungeonGenerator.GenerateFloor(floor, parentFolder)
+function DungeonGenerator.GenerateFloor(floor, parentFolder, themeIndex)
     math.randomseed(tick() + floor * 1000)
 
-    local theme, cycle = DungeonThemes.GetThemeForFloor(floor)
+    local theme, cycle
+    if themeIndex and DungeonThemes.Themes[themeIndex] then
+        theme = DungeonThemes.Themes[themeIndex]
+        cycle = math.floor((floor - 1) / #DungeonThemes.Themes) + 1
+    else
+        theme, cycle = DungeonThemes.GetThemeForFloor(floor)
+    end
     local graph = buildRoomGraph(floor)
 
     local floorFolder = Instance.new("Folder")
@@ -362,8 +441,11 @@ function DungeonGenerator.GenerateFloor(floor, parentFolder)
         builtRooms[room.Id] = { Folder = folder, Data = room }
     end
 
-    -- Export the room spacing constant so GameManager can place enemies correctly
-    floorFolder:SetAttribute("RoomSpacing", ROOM_SPACING)
+    -- Export spacing and world offset so GameManager places enemies at the right position
+    floorFolder:SetAttribute("RoomSpacing",  ROOM_SPACING)
+    floorFolder:SetAttribute("WorldOffsetX", DUNGEON_WORLD_OFFSET.X)
+    floorFolder:SetAttribute("WorldOffsetY", DUNGEON_WORLD_OFFSET.Y)
+    floorFolder:SetAttribute("WorldOffsetZ", DUNGEON_WORLD_OFFSET.Z)
 
     print(("[DungeonGenerator] Floor %d generated — Theme: %s, Rooms: %d, Cycle: %d"):format(
         floor, theme.Name, #graph, cycle))

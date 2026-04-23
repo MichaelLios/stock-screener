@@ -85,6 +85,112 @@ SynergySystem.Synergies = {
             BankaiTornadoDmgMult   = 1.40,
         },
     },
+
+    -- ── CHAIN REACTION SYNERGIES ───────────────────────────────────────────────
+
+    -- Killing any enemy immediately resets ShadowStep cooldown
+    Reaper = {
+        DisplayName      = "Reaper",
+        RequiredAbilities = { "ShadowStep", "PoisonBlade" },
+        Color            = Color3.fromRGB(80, 0, 120),
+        Description      = "Killing any enemy instantly resets ShadowStep cooldown.\nPoison duration +3 s on all poison applications.",
+        Bonuses = {
+            KillResetShadowStep = true,
+            PoisonDurBonus      = 3,
+        },
+    },
+
+    -- ThunderClap / BladeTornado / SkywardSlash: every damage hit chains to 2 nearby enemies
+    StormKing = {
+        DisplayName      = "Storm King",
+        RequiredAbilities = { "ThunderClap", "BladeTornado", "SkywardSlash" },
+        Color            = Color3.fromRGB(200, 230, 80),
+        Description      = "LEGENDARY — Every ability hit chains lightning to 2 nearby enemies at 45% power.\nThunderClap damage ×1.5.",
+        Legendary        = true,
+        Bonuses = {
+            ChainLightningCount = 2,
+            ThunderClapDmgMult  = 1.50,
+        },
+    },
+
+    -- ── SCALING SYNERGIES ──────────────────────────────────────────────────────
+
+    -- Each kill builds Void Stacks (+2% all damage per stack, max 20, persists across rooms)
+    VoidEater = {
+        DisplayName      = "Void Eater",
+        RequiredAbilities = { "SoulDrain", "DeathMark" },
+        Color            = Color3.fromRGB(100, 20, 160),
+        Description      = "Each kill builds a Void Stack (+2% all damage, max 20).\nStacks persist across rooms.",
+        Bonuses = {
+            VoidStackOnKill = true,
+        },
+    },
+
+    -- Below 50% HP, missing HP multiplies damage (scales to 2× at 0 HP)
+    BloodRage = {
+        DisplayName      = "Blood Rage",
+        RequiredAbilities = { "HeavyPunch", "RagingRush", "Taunt" },
+        Color            = Color3.fromRGB(220, 30, 30),
+        Description      = "LEGENDARY — Below 50% HP, missing HP translates to bonus damage (up to ×2.0 at 0 HP).\nRagingRush always stuns enemies it hits.",
+        Legendary        = true,
+        Bonuses = {
+            BloodRageMissingHPMult = true,
+            OniRushStun            = true,
+        },
+    },
+
+    -- ── COOLDOWN RESET SYNERGIES ───────────────────────────────────────────────
+
+    -- Killing a poisoned enemy resets DeathMark CD + grants 3 free PoisonCoat stacks
+    DeathBringer = {
+        DisplayName      = "Death Bringer",
+        RequiredAbilities = { "DeathMark", "VenomStrike", "PoisonBlade" },
+        Color            = Color3.fromRGB(140, 200, 20),
+        Description      = "LEGENDARY — Killing a poisoned enemy resets DeathMark cooldown and grants 3 free Poison Coat stacks.\nPoison and venom deal +30% damage.",
+        Legendary        = true,
+        Bonuses = {
+            PoisonKillResetDeathMark = true,
+        },
+    },
+
+    -- MagicBolt hits reduce ArcaneOrb CD by 1 s; ArcaneOrb detonation triggers a free mini burst
+    ArcaneFusion = {
+        DisplayName      = "Arcane Fusion",
+        RequiredAbilities = { "MagicBolt", "ArcaneOrb", "ElementalBurst" },
+        Color            = Color3.fromRGB(200, 60, 255),
+        Description      = "LEGENDARY — MagicBolt hits reduce ArcaneOrb cooldown by 1 s.\nArcaneOrb detonation triggers a free ElementalBurst AOE at 80% power.",
+        Legendary        = true,
+        Bonuses = {
+            MagicBoltReducesArcaneOrbCD = true,
+            ArcaneOrbFreeBurst          = true,
+        },
+    },
+
+    -- While BankaiFrenzy active: SoulDrain heals 3×, ChakraStrike auto-crits
+    SoulReap = {
+        DisplayName      = "Soul Reap",
+        RequiredAbilities = { "BankaiFrenzy", "SoulDrain", "ChakraStrike" },
+        Color            = Color3.fromRGB(255, 80, 180),
+        Description      = "LEGENDARY — While Bankai Frenzy is active: SoulDrain heals ×3 and ChakraStrike auto-crits.\nBankai duration +6 s.",
+        Legendary        = true,
+        Bonuses = {
+            SoulReapBankaiHealMult  = 3.0,
+            SoulReapChakraAutoCrit  = true,
+            SoulReapBankaiDurBonus  = 6,
+        },
+    },
+
+    -- RagingRush always stuns; GroundSlam leaves a 5-second burning field
+    OniRush = {
+        DisplayName      = "Oni Rush",
+        RequiredAbilities = { "RagingRush", "GroundSlam" },
+        Color            = Color3.fromRGB(255, 120, 0),
+        Description      = "RagingRush hit enemies are always Stunned for 1.5 s.\nGroundSlam leaves a burning hazard field dealing 8 damage/0.5 s for 5 s.",
+        Bonuses = {
+            OniRushStun     = true,
+            OniSlamFireField = true,
+        },
+    },
 }
 
 -- ────────────────────────────────────────────────

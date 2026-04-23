@@ -27,6 +27,30 @@
       },
       "WorldBuilder": {
         "$path": "src/ServerScriptService/WorldBuilder.server.lua"
+      },
+      "WorldBuilderModule": {
+        "$path": "src/ServerScriptService/WorldBuilderModule.lua"
+      },
+      "DynamicEventManager": {
+        "$path": "src/ServerScriptService/DynamicEventManager.lua"
+      },
+      "GamblingSystem": {
+        "$path": "src/ServerScriptService/GamblingSystem.lua"
+      },
+      "CosmeticsSystem": {
+        "$path": "src/ServerScriptService/CosmeticsSystem.lua"
+      },
+      "LeaderboardSystem": {
+        "$path": "src/ServerScriptService/LeaderboardSystem.lua"
+      },
+      "SeasonalEventManager": {
+        "$path": "src/ServerScriptService/SeasonalEventManager.lua"
+      },
+      "ChallengeTracker": {
+        "$path": "src/ServerScriptService/ChallengeTracker.lua"
+      },
+      "EnemyAvatars": {
+        "$path": "src/ServerScriptService/EnemyAvatars.lua"
       }
     },
     "ReplicatedStorage": {
@@ -59,6 +83,42 @@
         },
         "AwakeningData": {
           "$path": "src/ReplicatedStorage/Modules/AwakeningData.lua"
+        },
+        "LoreData": {
+          "$path": "src/ReplicatedStorage/Modules/LoreData.lua"
+        },
+        "DungeonMechanics": {
+          "$path": "src/ReplicatedStorage/Modules/DungeonMechanics.lua"
+        },
+        "NpcData": {
+          "$path": "src/ReplicatedStorage/Modules/NpcData.lua"
+        },
+        "BountyData": {
+          "$path": "src/ReplicatedStorage/Modules/BountyData.lua"
+        },
+        "CurseData": {
+          "$path": "src/ReplicatedStorage/Modules/CurseData.lua"
+        },
+        "OriginData": {
+          "$path": "src/ReplicatedStorage/Modules/OriginData.lua"
+        },
+        "AbilityEvolution": {
+          "$path": "src/ReplicatedStorage/Modules/AbilityEvolution.lua"
+        },
+        "DynamicEvents": {
+          "$path": "src/ReplicatedStorage/Modules/DynamicEvents.lua"
+        },
+        "CosmeticsData": {
+          "$path": "src/ReplicatedStorage/Modules/CosmeticsData.lua"
+        },
+        "SeasonalEvents": {
+          "$path": "src/ReplicatedStorage/Modules/SeasonalEvents.lua"
+        },
+        "ChallengeData": {
+          "$path": "src/ReplicatedStorage/Modules/ChallengeData.lua"
+        },
+        "StartingBonusData": {
+          "$path": "src/ReplicatedStorage/Modules/StartingBonusData.lua"
         }
       },
       "RemoteEvents": {
@@ -80,25 +140,72 @@
         "MetaSync":          { "$className": "RemoteEvent" },
         "MetaUpgrade":       { "$className": "RemoteEvent" },
         "ActivateAwakening": { "$className": "RemoteEvent" },
-        "AwakeningState":    { "$className": "RemoteEvent" }
+        "AwakeningState":    { "$className": "RemoteEvent" },
+        "PickCurse":         { "$className": "RemoteEvent" },
+        "SelectOrigin":      { "$className": "RemoteEvent" },
+        "AbilityCast":       { "$className": "RemoteEvent" },
+        "PickGamble":        { "$className": "RemoteEvent" },
+        "GambleResult":      { "$className": "RemoteEvent" },
+        "StatusApplied":     { "$className": "RemoteEvent" },
+        "SetCosmetic":       { "$className": "RemoteEvent" },
+        "CosmeticSync":      { "$className": "RemoteEvent" },
+        "LeaderboardData":   { "$className": "RemoteEvent" },
+        "RequestLeaderboard":{ "$className": "RemoteEvent" },
+        "ChallengeUpdate":   { "$className": "RemoteEvent" },
+        "WeeklyModifier":    { "$className": "RemoteEvent" },
+        "SelectBonus":       { "$className": "RemoteEvent" },
+        "SelectArchetype":   { "$className": "RemoteEvent" },
+        "BuyItem":           { "$className": "RemoteEvent" },
+        "EnterRoom":         { "$className": "RemoteEvent" },
+        "UseItem":           { "$className": "RemoteEvent" }
       }
     },
-    "StarterPlayerScripts": {
-      "$className": "StarterPlayerScripts",
-      "LocalGame": {
-        "$path": "src/StarterPlayerScripts/LocalGame.client.lua"
-      },
-      "AbilityInput": {
-        "$path": "src/StarterPlayerScripts/AbilityInput.client.lua"
-      },
-      "CombatVFX": {
-        "$path": "src/StarterPlayerScripts/CombatVFX.client.lua"
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "LocalGame": {
+          "$path": "src/StarterPlayerScripts/LocalGame.client.lua"
+        },
+        "AbilityInput": {
+          "$path": "src/StarterPlayerScripts/AbilityInput.client.lua"
+        },
+        "CombatVFX": {
+          "$path": "src/StarterPlayerScripts/CombatVFX.client.lua"
+        },
+        "AtmosphereManager": {
+          "$path": "src/StarterPlayerScripts/AtmosphereManager.client.lua"
+        },
+        "AbilityVFX": {
+          "$path": "src/StarterPlayerScripts/AbilityVFX.client.lua"
+        },
+        "PortalAnimator": {
+          "$path": "src/StarterPlayerScripts/PortalAnimator.client.lua"
+        },
+        "LobbyInteraction": {
+          "$path": "src/StarterPlayerScripts/LobbyInteraction.client.lua"
+        },
+        "PlayerController": {
+          "$path": "src/StarterPlayerScripts/PlayerController.client.lua"
+        },
+        "MusicManager": {
+          "$path": "src/StarterPlayerScripts/MusicManager.client.lua"
+        },
+        "SettingsInventory": {
+          "$path": "src/StarterPlayerScripts/SettingsInventory.client.lua"
+        }
       }
     },
     "StarterGui": {
       "$className": "StarterGui",
       "HUD": {
         "$path": "src/StarterGui/HUD.client.lua"
+      }
+    },
+    "ServerStorage": {
+      "$className": "ServerStorage",
+      "DungeonPreviewPlugin": {
+        "$path": "src/ServerStorage/DungeonPreviewPlugin.server.lua"
       }
     }
   }

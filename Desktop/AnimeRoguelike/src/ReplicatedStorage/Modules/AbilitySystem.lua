@@ -35,7 +35,7 @@ AbilitySystem.Abilities = {
         Description = "Dash forward, passing through enemies and dealing light damage.",
         Icon = "rbxassetid://0",
         MPCost = 15,
-        Cooldown = 4,
+        Cooldown = 2,
         Range = 20,
         Effects = {
             { Type = ET.Teleport, Distance = 20 },
@@ -49,7 +49,7 @@ AbilitySystem.Abilities = {
         Description = "Spin rapidly creating a vortex of slashes around you.",
         Icon = "rbxassetid://0",
         MPCost = 30,
-        Cooldown = 8,
+        Cooldown = 4,
         Range = 12,
         Effects = {
             { Type = ET.AOE, Radius = 12, Damage = true, Multiplier = 1.4, DamageType = "Physical" },
@@ -63,7 +63,7 @@ AbilitySystem.Abilities = {
         Description = "Breathing Technique — Thunder: a lightning-fast slash that stuns.",
         Icon = "rbxassetid://0",
         MPCost = 45,
-        Cooldown = 12,
+        Cooldown = 5,
         Range = 15,
         Effects = {
             { Type = ET.Damage, Multiplier = 2.2, DamageType = "Lightning" },
@@ -94,7 +94,7 @@ AbilitySystem.Abilities = {
         Description = "Erect a barrier of mana that absorbs the next hit.",
         Icon = "rbxassetid://0",
         MPCost = 25,
-        Cooldown = 10,
+        Cooldown = 5,
         Range = 0,
         Effects = {
             { Type = ET.Buff, Buff = "ManaShield", Duration = 6, AbsorbAmount = 80 },
@@ -107,7 +107,7 @@ AbilitySystem.Abilities = {
         Description = "Unleash a burst of combined fire, ice, and lightning in all directions.",
         Icon = "rbxassetid://0",
         MPCost = 60,
-        Cooldown = 15,
+        Cooldown = 7,
         Range = 0,
         Effects = {
             { Type = ET.AOE, Radius = 18, Damage = true, Multiplier = 1.8, DamageType = "Magic" },
@@ -137,7 +137,7 @@ AbilitySystem.Abilities = {
         Description = "Draw all nearby enemies to target you and boost your defense.",
         Icon = "rbxassetid://0",
         MPCost = 20,
-        Cooldown = 12,
+        Cooldown = 6,
         Range = 0,
         Effects = {
             { Type = ET.AOE, Radius = 25, Debuff = "Taunted", Duration = 5 },
@@ -151,7 +151,7 @@ AbilitySystem.Abilities = {
         Description = "Charge forward smashing through every enemy in the way.",
         Icon = "rbxassetid://0",
         MPCost = 35,
-        Cooldown = 10,
+        Cooldown = 5,
         Range = 30,
         Effects = {
             { Type = ET.Teleport, Distance = 30 },
@@ -168,7 +168,7 @@ AbilitySystem.Abilities = {
         Description = "Teleport behind a targeted enemy and deal a backstab.",
         Icon = "rbxassetid://0",
         MPCost = 25,
-        Cooldown = 6,
+        Cooldown = 3,
         Range = 30,
         Effects = {
             { Type = ET.Teleport, ToBehindTarget = true },
@@ -182,7 +182,7 @@ AbilitySystem.Abilities = {
         Description = "Coat your blade in lethal poison for the next 3 attacks.",
         Icon = "rbxassetid://0",
         MPCost = 20,
-        Cooldown = 8,
+        Cooldown = 4,
         Range = 0,
         Effects = {
             { Type = ET.Buff, Buff = "PoisonCoat", Duration = 10, Stacks = 3 },
@@ -195,7 +195,7 @@ AbilitySystem.Abilities = {
         Description = "Mark an enemy — the next ability hit deals triple damage.",
         Icon = "rbxassetid://0",
         MPCost = 40,
-        Cooldown = 14,
+        Cooldown = 7,
         Range = 40,
         Effects = {
             { Type = ET.Debuff, Debuff = "DeathMark", Duration = 8, DamageMultiplier = 3.0 },
@@ -227,7 +227,7 @@ AbilitySystem.Abilities = {
         Description = "Release a shockwave of spirit pressure that pushes enemies back.",
         Icon = "rbxassetid://0",
         MPCost = 30,
-        Cooldown = 8,
+        Cooldown = 4,
         Range = 0,
         Effects = {
             { Type = ET.AOE, Radius = 15, Damage = true, Multiplier = 0.8, DamageType = "Spirit" },
@@ -241,8 +241,8 @@ AbilitySystem.Abilities = {
         Name = "Bankai Frenzy",
         Description = "Release your true form — enter a frenzied state boosting all stats for 10 seconds.",
         Icon = "rbxassetid://0",
-        MPCost = 80,
-        Cooldown = 30,
+        MPCost = 60,
+        Cooldown = 15,
         Range = 0,
         Effects = {
             { Type = ET.Buff, Buff = "BankaiState", Duration = 10, AtkMultiplier = 2.0, SpdMultiplier = 1.5, DefMultiplier = 1.3 },
@@ -257,7 +257,7 @@ AbilitySystem.Abilities = {
         Description = "A rising slash that launches enemies upward, then slams them down.",
         Icon = "rbxassetid://0",
         MPCost = 35,
-        Cooldown = 9,
+        Cooldown = 4,
         Range = 10,
         Effects = {
             { Type = ET.AOE, Radius = 8, Damage = true, Multiplier = 1.2, DamageType = "Physical" },
@@ -271,7 +271,7 @@ AbilitySystem.Abilities = {
         Description = "Enter a ready stance — your next attack deals 3x damage.",
         Icon = "rbxassetid://0",
         MPCost = 30,
-        Cooldown = 12,
+        Cooldown = 6,
         Range = 0,
         Effects = {
             { Type = ET.Buff, Buff = "CounterReady", Duration = 5, DamageMultiplier = 3.0 },
@@ -286,7 +286,7 @@ AbilitySystem.Abilities = {
         Description = "Releases a burst of ice that slows all enemies nearby.",
         Icon = "rbxassetid://0",
         MPCost = 40,
-        Cooldown = 10,
+        Cooldown = 5,
         Range = 0,
         Effects = {
             { Type = ET.AOE, Radius = 14, Damage = true, Multiplier = 1.0, DamageType = "Ice" },
@@ -300,7 +300,7 @@ AbilitySystem.Abilities = {
         Description = "A slow but massive orb of pure mana that detonates on impact.",
         Icon = "rbxassetid://0",
         MPCost = 50,
-        Cooldown = 12,
+        Cooldown = 6,
         Range = 50,
         Effects = {
             { Type = ET.Damage, Multiplier = 3.2, DamageType = "Magic" },
@@ -317,7 +317,7 @@ AbilitySystem.Abilities = {
         Description = "Slam the ground with Haki force, stunning all nearby enemies.",
         Icon = "rbxassetid://0",
         MPCost = 30,
-        Cooldown = 11,
+        Cooldown = 5,
         Range = 0,
         Effects = {
             { Type = ET.AOE, Radius = 12, Damage = true, Multiplier = 1.3, DamageType = "Physical" },
@@ -331,7 +331,7 @@ AbilitySystem.Abilities = {
         Description = "Coat your body in Armament Haki — halves all incoming damage for 8 seconds.",
         Icon = "rbxassetid://0",
         MPCost = 35,
-        Cooldown = 18,
+        Cooldown = 9,
         Range = 0,
         Effects = {
             { Type = ET.Buff, Buff = "IronSkin", Duration = 8, DamageReduction = 0.5 },
@@ -346,7 +346,7 @@ AbilitySystem.Abilities = {
         Description = "Throw a smoke bomb that slows all enemies caught in the cloud.",
         Icon = "rbxassetid://0",
         MPCost = 20,
-        Cooldown = 10,
+        Cooldown = 5,
         Range = 18,
         Effects = {
             { Type = ET.AOE, Radius = 12, Debuff = "Slow", Duration = 4 },
@@ -359,7 +359,7 @@ AbilitySystem.Abilities = {
         Description = "A quick stab that injects lethal poison for 6 seconds.",
         Icon = "rbxassetid://0",
         MPCost = 25,
-        Cooldown = 7,
+        Cooldown = 3,
         Range = 6,
         Effects = {
             { Type = ET.Damage, Multiplier = 0.8, DamageType = "Poison" },
@@ -374,8 +374,8 @@ AbilitySystem.Abilities = {
         Name = "Soul Drain",
         Description = "Drain the life force of nearby enemies, healing yourself.",
         Icon = "rbxassetid://0",
-        MPCost = 45,
-        Cooldown = 12,
+        MPCost = 40,
+        Cooldown = 6,
         Range = 0,
         Effects = {
             { Type = ET.AOE, Radius = 14, Damage = true, Multiplier = 0.8, DamageType = "Spirit" },
@@ -389,7 +389,7 @@ AbilitySystem.Abilities = {
         Description = "Focus all chakra into one devastating blow. Restores 40 Haki on hit.",
         Icon = "rbxassetid://0",
         MPCost = 50,
-        Cooldown = 10,
+        Cooldown = 5,
         Range = 8,
         Effects = {
             { Type = ET.Damage, Multiplier = 2.5, DamageType = "Spirit" },
@@ -405,7 +405,7 @@ AbilitySystem.Abilities = {
         Description = "Create a healing pool that restores HP over time.",
         Icon = "rbxassetid://0",
         MPCost = 35,
-        Cooldown = 16,
+        Cooldown = 8,
         Range = 0,
         Effects = {
             { Type = ET.Heal, Amount = 40, OverTime = true, Duration = 6, Interval = 1 },
@@ -418,7 +418,7 @@ AbilitySystem.Abilities = {
         Description = "Channel energy into a massive beam that destroys everything in its path.",
         Icon = "rbxassetid://0",
         MPCost = 100,
-        Cooldown = 45,
+        Cooldown = 20,
         Range = 80,
         Effects = {
             { Type = ET.Damage, Multiplier = 5.0, DamageType = "Spirit", IsBeam = true, Width = 6 },

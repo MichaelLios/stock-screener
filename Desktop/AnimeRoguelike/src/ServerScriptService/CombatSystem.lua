@@ -6,17 +6,32 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService        = game:GetService("RunService")
 local Debris            = game:GetService("Debris")
 
-local CharacterStats  = require(ReplicatedStorage.Modules.CharacterStats)
-local AbilitySystem   = require(ReplicatedStorage.Modules.AbilitySystem)
-local SynergySystem   = require(ReplicatedStorage.Modules.SynergySystem)
-local AwakeningData   = require(ReplicatedStorage.Modules.AwakeningData)
+local CharacterStats   = require(ReplicatedStorage.Modules.CharacterStats)
+local AbilitySystem    = require(ReplicatedStorage.Modules.AbilitySystem)
+local SynergySystem    = require(ReplicatedStorage.Modules.SynergySystem)
+local AwakeningData    = require(ReplicatedStorage.Modules.AwakeningData)
+local AbilityEvolution = require(ReplicatedStorage.Modules.AbilityEvolution)
+
+-- Lazy-require DynamicEventManager to avoid load-order issues
+local _DynEvtMgr = nil
+local function getDynEvtMgr()
+    if not _DynEvtMgr then
+        local ok, m = pcall(require, script.Parent.DynamicEventManager)
+        if ok then _DynEvtMgr = m end
+    end
+    return _DynEvtMgr
+end
 
 local RemoteEvents       = ReplicatedStorage:WaitForChild("RemoteEvents")
 local UseAbility         = RemoteEvents:WaitForChild("UseAbility")
 local TakeDamage         = RemoteEvents:WaitForChild("TakeDamage")
 local UpdateHUD          = RemoteEvents:WaitForChild("UpdateHUD")
+local AbilityCastEvt       = RemoteEvents:WaitForChild("AbilityCast",       15)
 local ActivateAwakeningEvt = RemoteEvents:WaitForChild("ActivateAwakening", 15)
 local AwakeningStateEvt    = RemoteEvents:WaitForChild("AwakeningState",    15)
+local PickGambleEvt        = RemoteEvents:WaitForChild("PickGamble",        15)
+local GambleResultEvt      = RemoteEvents:WaitForChild("GambleResult",      15)
+local StatusAppliedEvt     = RemoteEvents:WaitForChild("StatusApplied",     15)
 
 -- ────────────────────────────────────────────────
 -- PLAYER STATE (server-authoritative)
@@ -46,6 +61,12 @@ Players.PlayerAdded:Connect(function(player)
             KnownAbilities   = {},                             -- all learned ability names
             ActiveSlots      = { false,false,false,false,false }, -- equipped (1-5)
             AwakeningGauge   = 0,                              -- 0–100; fills during combat
+            ComboCount        = 0,   -- consecutive hits for damage bonus
+            LastHitTime       = 0,   -- tick() of last hit landing
+            EvoXP             = {},  -- [abilityName] = hits landed with it this run
+            EvoStage          = {},  -- [abilityName] = current evolution stage (0–2)
+            VoidStacks        = 0,   -- VoidEater synergy kill accumulator (max 20)
+            LastUsedAbility   = nil, -- most-recently fired ability (for evolution XP)
         }
     end)
 end)
@@ -67,6 +88,14 @@ local function applyDebuff(target, debuff)
     if typeof(target) == "Instance" then
         if not EnemyDebuffs[target] then EnemyDebuffs[target] = {} end
         EnemyDebuffs[target][debuff.Debuff] = { Duration = debuff.Duration, Data = debuff }
+        -- Broadcast to clients for status effect VFX
+        if StatusAppliedEvt then
+            StatusAppliedEvt:FireAllClients({
+                TargetId     = target:GetAttribute("EnemyId"),
+                StatusType   = debuff.Debuff,
+                Duration     = debuff.Duration,
+            })
+        end
     else
         if not target.Debuffs then target.Debuffs = {} end
         target.Debuffs[debuff.Debuff] = { Duration = debuff.Duration, Data = debuff }
@@ -112,6 +141,10 @@ RunService.Heartbeat:Connect(function(dt)
             if state.Cooldowns[name] <= 0 then
                 state.Cooldowns[name] = nil
             end
+        end
+        -- Combo decay: reset if no hit landed in the last 2.5 seconds
+        if (state.ComboCount or 0) > 0 and tick() - (state.LastHitTime or 0) > 2.5 then
+            state.ComboCount = 0
         end
         -- Passive regen from items
         local stats = state.Stats
@@ -184,6 +217,7 @@ local function applyDamageToPlayer(player, rawDamage, damageType)
 
     dmg = math.max(1, dmg)
     state.HP = math.max(0, state.HP - dmg)
+    state.ComboCount = 0  -- taking a hit breaks the combo
 
     -- ── Awakening gauge fill (damage taken) ─────────────────────────────────
     if not hasBuff(state, "AwakeningActive") then
@@ -205,7 +239,8 @@ local function applyDamageToPlayer(player, rawDamage, damageType)
         AwakeningGauge  = state.AwakeningGauge or 0,
     })
 
-    if state.HP <= 0 then
+    if state.HP <= 0 and not state.IsDead then
+        state.IsDead = true
         RemoteEvents.PlayerDied:FireClient(player)
     end
 
@@ -313,6 +348,85 @@ local function applyDamageToEnemy(enemyModel, rawDamage, damageType, attackerSta
         end
     end
 
+    -- ── Combo tracking: increment on each successful hit ────────────────────
+    if attackerState then
+        attackerState.ComboCount  = (attackerState.ComboCount  or 0) + 1
+        attackerState.LastHitTime = tick()
+    end
+
+    -- ── Ability evolution: XP tracking + per-hit stage bonuses ──────────────
+    if attackerState and attackerState.LastUsedAbility then
+        local evAbName = attackerState.LastUsedAbility
+        local evoData  = AbilityEvolution.GetEvolution(evAbName)
+        if evoData then
+            local xp       = (attackerState.EvoXP[evAbName] or 0) + 1
+            attackerState.EvoXP[evAbName] = xp
+            local curStage = attackerState.EvoStage[evAbName] or 0
+            local threshold = evoData.XPThresholds[curStage + 1]
+            if threshold and xp >= threshold then
+                local newStage = curStage + 1
+                attackerState.EvoStage[evAbName] = newStage
+                curStage = newStage
+                local stageDef = evoData.Stages[newStage]
+                -- Notify the attacking player
+                for _, p in ipairs(game:GetService("Players"):GetPlayers()) do
+                    if PlayerState[p] == attackerState then
+                        UpdateHUD:FireClient(p, {
+                            Message  = "✨  " .. (stageDef and stageDef.Name or evAbName) .. "  EVOLVED!",
+                            Duration = 4,
+                        })
+                        break
+                    end
+                end
+            end
+            -- Apply per-hit bonuses for current stage
+            if curStage > 0 and evoData.Stages[curStage] then
+                local bonus = evoData.Stages[curStage].Bonus
+                if bonus.LifeSteal then
+                    attackerState.HP = math.min(
+                        attackerState.HP + math.max(1, math.floor(dmg * bonus.LifeSteal)),
+                        attackerState.Stats.MaxHP
+                    )
+                end
+                if bonus.CDRefund and attackerState.Cooldowns[evAbName] then
+                    attackerState.Cooldowns[evAbName] = math.max(0,
+                        attackerState.Cooldowns[evAbName] - bonus.CDRefund)
+                end
+                if bonus.MPRestore then
+                    attackerState.MP = math.min(
+                        attackerState.MP + bonus.MPRestore, attackerState.Stats.MaxMP)
+                end
+            end
+        end
+    end
+
+    -- ── Kill processing: synergy hooks ───────────────────────────────────────
+    if newHP == 0 and attackerState then
+        local killSyns = SynergySystem.GetActiveSynergies(attackerState.ActiveSlots)
+        -- Reaper: kill resets ShadowStep cooldown
+        if SynergySystem.GetBonus(killSyns, "KillResetShadowStep") then
+            attackerState.Cooldowns["ShadowStep"] = nil
+        end
+        -- DeathBringer: kill of poisoned enemy resets DeathMark + free PoisonCoat stacks
+        if SynergySystem.GetBonus(killSyns, "PoisonKillResetDeathMark")
+        and hasDebuff(enemyModel, "Poison") then
+            attackerState.Cooldowns["DeathMark"] = nil
+            local coat = attackerState.Buffs["PoisonCoat"]
+            if coat then
+                coat.Data.Stacks = (coat.Data.Stacks or 0) + 3
+            else
+                attackerState.Buffs["PoisonCoat"] = {
+                    Duration = 15,
+                    Data     = { Buff = "PoisonCoat", Stacks = 3 },
+                }
+            end
+        end
+        -- VoidEater: +1 Void Stack per kill (max 20, persists across rooms)
+        if SynergySystem.GetBonus(killSyns, "VoidStackOnKill") then
+            attackerState.VoidStacks = math.min(20, (attackerState.VoidStacks or 0) + 1)
+        end
+    end
+
     -- ── Floating damage number (clients render this) ─────────────────────────
     local enemyRoot = enemyModel:FindFirstChild("HumanoidRootPart")
         or enemyModel.PrimaryPart
@@ -362,6 +476,34 @@ local function getAttackMultiplier(state, activeSynergies)
     if hasBuff(state, "AwakeningActive") then
         mult = mult * (state.Buffs["AwakeningActive"].Data.AtkMult or 2.0)
     end
+    -- Combo multiplier: +3% per consecutive hit, capped at 10 hits (+30%)
+    local combo = state.ComboCount or 0
+    if combo > 1 then
+        mult = mult * (1 + math.min(combo - 1, 9) * 0.03)
+    end
+    -- VoidEater synergy: +2% per Void Stack (max 20 stacks = +40%)
+    local voidStacks = state.VoidStacks or 0
+    if voidStacks > 0 then
+        mult = mult * (1 + voidStacks * 0.02)
+    end
+    -- BloodRage synergy: below 50% HP, damage scales up toward 2× at 0 HP
+    if activeSynergies and SynergySystem.GetBonus(activeSynergies, "BloodRageMissingHPMult") then
+        local hpPct = state.HP / math.max(state.Stats.MaxHP, 1)
+        if hpPct < 0.50 then
+            mult = mult * (1 + (1 - hpPct))  -- +50% at half HP, +100% at 0 HP
+        end
+    end
+    -- DynamicEvent player Atk multiplier
+    local dyn = getDynEvtMgr()
+    if dyn then
+        local dynPlayer = nil
+        for _, p in ipairs(game:GetService("Players"):GetPlayers()) do
+            if PlayerState[p] == state then dynPlayer = p; break end
+        end
+        if dynPlayer then
+            mult = mult * dyn.GetPlayerAtkMult(dynPlayer)
+        end
+    end
     return mult
 end
 
@@ -373,12 +515,15 @@ local function findEnemiesInRadius(origin, radius)
             if rootPart then
                 local dist = (rootPart.Position - origin).Magnitude
                 if dist <= radius then
-                    table.insert(found, obj)
+                    table.insert(found, { model = obj, dist = dist })
                 end
             end
         end
     end
-    return found
+    table.sort(found, function(a, b) return a.dist < b.dist end)
+    local result = {}
+    for _, entry in ipairs(found) do table.insert(result, entry.model) end
+    return result
 end
 
 local function findEnemiesOnPath(startPos, endPos, halfWidth)
@@ -428,6 +573,24 @@ local function executeEffect(effect, player, state, targetEnemy, aimDirection, a
         if abilityName == "BladeTornado" and hasBuff(state, "BankaiState")
         and SynergySystem.GetBonus(activeSynergies, "BankaiTornadoDmgMult") then
             dmg = dmg * SynergySystem.GetBonus(activeSynergies, "BankaiTornadoDmgMult")
+        end
+
+        -- Apply ability evolution DmgMult bonus
+        local evoStage = (state.EvoStage and state.EvoStage[abilityName]) or 0
+        local evoBonus = nil
+        if evoStage > 0 then
+            local evoData2 = AbilityEvolution.GetEvolution(abilityName)
+            if evoData2 and evoData2.Stages[evoStage] then
+                evoBonus = evoData2.Stages[evoStage].Bonus
+                if evoBonus.DmgMult then
+                    dmg = dmg * evoBonus.DmgMult
+                end
+            end
+        end
+        -- SoulReap: ChakraStrike auto-crits while BankaiFrenzy is active
+        if abilityName == "ChakraStrike" and hasBuff(state, "BankaiState")
+        and SynergySystem.GetBonus(activeSynergies, "SoulReapChakraAutoCrit") then
+            dmg = dmg * (stats.CritMult or 1.8)
         end
 
         -- Check if this ability uses projectile travel
@@ -501,8 +664,91 @@ local function executeEffect(effect, player, state, targetEnemy, aimDirection, a
                     if proj.Parent then proj:Destroy() end
                 end)
             end
-        elseif targetEnemy then
-            applyDamageToEnemy(targetEnemy, dmg, effect.DamageType, state)
+        else
+            -- No projectile: auto-target the nearest enemy within ability range (melee / targeted)
+            local actualTarget = targetEnemy
+            if not actualTarget then
+                local char = player.Character
+                local root = char and char:FindFirstChild("HumanoidRootPart")
+                if root then
+                    local abDef2 = AbilitySystem.GetAbility(abilityName)
+                    local range = (abDef2 and abDef2.Range) or 8
+                    local nearby = findEnemiesInRadius(root.Position, range)
+                    if #nearby > 0 then actualTarget = nearby[1] end
+                end
+            end
+            if actualTarget then
+                applyDamageToEnemy(actualTarget, dmg, effect.DamageType, state)
+
+                -- StormKing: chain lightning to nearby enemies
+                if SynergySystem.GetBonus(activeSynergies, "ChainLightningCount") then
+                    local chainCount = SynergySystem.GetBonus(activeSynergies, "ChainLightningCount")
+                    local chainDmg   = math.floor(dmg * 0.45)
+                    local cRoot = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+                    if cRoot then
+                        local nearby = findEnemiesInRadius(cRoot.Position, 22)
+                        local chained = 0
+                        for _, chEnemy in ipairs(nearby) do
+                            if chEnemy ~= actualTarget and chained < chainCount then
+                                applyDamageToEnemy(chEnemy, chainDmg, "Lightning", state)
+                                chained = chained + 1
+                            end
+                        end
+                    end
+                end
+
+                -- ArcaneFusion: MagicBolt hits reduce ArcaneOrb cooldown by 1 s
+                if abilityName == "MagicBolt"
+                and SynergySystem.GetBonus(activeSynergies, "MagicBoltReducesArcaneOrbCD")
+                and state.Cooldowns["ArcaneOrb"] then
+                    state.Cooldowns["ArcaneOrb"] = math.max(0, state.Cooldowns["ArcaneOrb"] - 1)
+                end
+
+                -- ArcaneFusion: ArcaneOrb detonation fires a free ElementalBurst AOE
+                if abilityName == "ArcaneOrb"
+                and SynergySystem.GetBonus(activeSynergies, "ArcaneOrbFreeBurst") then
+                    local epiRoot = actualTarget:FindFirstChild("HumanoidRootPart") or actualTarget.PrimaryPart
+                    if epiRoot then
+                        for _, bEnemy in ipairs(findEnemiesInRadius(epiRoot.Position, 14)) do
+                            applyDamageToEnemy(bEnemy, rawAtk * 0.80, "Magic", state)
+                        end
+                    end
+                end
+
+                -- OniRush: RagingRush stuns hit enemies
+                if abilityName == "RagingRush"
+                and SynergySystem.GetBonus(activeSynergies, "OniRushStun") then
+                    applyDebuff(actualTarget, { Debuff = "Stun", Duration = 1.5 })
+                end
+
+                -- AbilityResonance dynamic event: chain mini-AOE on every hit
+                local dyn4 = getDynEvtMgr()
+                local chainAOE = dyn4 and dyn4.GetAbilityChainAOE()
+                if chainAOE then
+                    local epiRoot2 = actualTarget:FindFirstChild("HumanoidRootPart") or actualTarget.PrimaryPart
+                    if epiRoot2 then
+                        for _, rEnemy in ipairs(findEnemiesInRadius(epiRoot2.Position, chainAOE.Radius)) do
+                            if rEnemy ~= actualTarget then
+                                applyDamageToEnemy(rEnemy, math.floor(dmg * chainAOE.Mult), effect.DamageType, state)
+                            end
+                        end
+                    end
+                end
+
+                -- Evolution ExtraAOEOnHit
+                if evoBonus and evoBonus.ExtraAOEOnHit then
+                    local epiRoot3 = actualTarget:FindFirstChild("HumanoidRootPart") or actualTarget.PrimaryPart
+                    if epiRoot3 then
+                        for _, aEnemy in ipairs(findEnemiesInRadius(epiRoot3.Position, evoBonus.ExtraAOEOnHit.Radius)) do
+                            if aEnemy ~= actualTarget then
+                                applyDamageToEnemy(aEnemy,
+                                    math.floor(dmg * evoBonus.ExtraAOEOnHit.Multiplier),
+                                    effect.DamageType, state)
+                            end
+                        end
+                    end
+                end
+            end
         end
 
     elseif effect.Type == "AOE" then
@@ -534,6 +780,22 @@ local function executeEffect(effect, player, state, targetEnemy, aimDirection, a
             end
         end
 
+        -- OniRush: GroundSlam leaves a burning hazard field for 5 seconds
+        if abilityName == "GroundSlam"
+        and SynergySystem.GetBonus(activeSynergies, "OniSlamFireField") then
+            local fieldPos = root.Position
+            task.spawn(function()
+                local elapsed = 0
+                while elapsed < 5 do
+                    task.wait(0.5)
+                    elapsed = elapsed + 0.5
+                    for _, fEnemy in ipairs(findEnemiesInRadius(fieldPos, 10)) do
+                        applyDamageToEnemy(fEnemy, math.floor(rawAtk * 0.25), "Fire", state)
+                    end
+                end
+            end)
+        end
+
     elseif effect.Type == "Knockback" then
         local char = player.Character
         if not char then return end
@@ -561,6 +823,19 @@ local function executeEffect(effect, player, state, targetEnemy, aimDirection, a
         -- Synergy: SpiritualHunger (+40 HP on SoulDrain)
         if abilityName == "SoulDrain" and SynergySystem.GetBonus(activeSynergies, "SoulDrainHealBonus") then
             healAmount = healAmount + SynergySystem.GetBonus(activeSynergies, "SoulDrainHealBonus")
+        end
+        -- SoulReap: SoulDrain heals 3× while BankaiFrenzy is active
+        if abilityName == "SoulDrain" and hasBuff(state, "BankaiState")
+        and SynergySystem.GetBonus(activeSynergies, "SoulReapBankaiHealMult") then
+            healAmount = math.floor(healAmount * SynergySystem.GetBonus(activeSynergies, "SoulReapBankaiHealMult"))
+        end
+        -- Evolution heal multiplier
+        local evoHStage = (state.EvoStage and state.EvoStage[abilityName]) or 0
+        if evoHStage > 0 then
+            local evoHData = AbilityEvolution.GetEvolution(abilityName)
+            if evoHData and evoHData.Stages[evoHStage] and evoHData.Stages[evoHStage].Bonus.HealAmountMult then
+                healAmount = math.floor(healAmount * evoHData.Stages[evoHStage].Bonus.HealAmountMult)
+            end
         end
         if effect.OverTime then
             coroutine.wrap(function()
@@ -673,10 +948,18 @@ UseAbility.OnServerEvent:Connect(function(player, abilityName, targetEnemyId, ai
     -- Stun check
     if hasDebuff(state, "Stun") then return end
 
-    -- Deduct MP and start cooldown
-    state.MP = state.MP - ab.MPCost
+    -- Deduct MP and start cooldown (apply CooldownReduction + dynamic event modifiers)
+    local dyn2 = getDynEvtMgr()
+    local zeroMP    = dyn2 and dyn2.IsZeroMPCost()
+    local cdEvtMult = dyn2 and dyn2.GetCooldownMult() or 1
+    local mpEvtMult = dyn2 and dyn2.GetMPCostMult()  or 1
+    if not zeroMP then
+        state.MP = state.MP - math.floor(ab.MPCost * 0.5 * mpEvtMult)
+    end
     if ab.Cooldown > 0 then
-        state.Cooldowns[abilityName] = ab.Cooldown
+        local cdR = state.Stats.CooldownReduction or 0
+        state.Cooldowns[abilityName] = math.max(0.5,
+            ab.Cooldown * (1 - cdR) * cdEvtMult)
     end
 
     -- Find target enemy model by attribute id
@@ -708,9 +991,30 @@ UseAbility.OnServerEvent:Connect(function(player, abilityName, targetEnemyId, ai
         end
     end
 
-    -- Execute all effects
+    -- Track last-used ability for evolution XP
+    state.LastUsedAbility = abilityName
+
+    -- Execute all effects (double-fire if VoidStorm dynamic event is active)
+    local dyn3      = getDynEvtMgr()
+    local doubleFire = dyn3 and dyn3.IsDoublefire()
     for _, effect in ipairs(ab.Effects) do
         executeEffect(effect, player, state, targetEnemy, aimDirection, abilityName, activeSynergies)
+        if doubleFire then
+            executeEffect(effect, player, state, targetEnemy, aimDirection, abilityName, activeSynergies)
+        end
+    end
+
+    -- Broadcast cast event to all clients for VFX/SFX
+    if AbilityCastEvt then
+        local char = player.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        AbilityCastEvt:FireAllClients({
+            AbilityName  = abilityName,
+            CasterUserId = player.UserId,
+            Position     = root and root.Position,
+            Direction    = aimDirection,
+            EvoStage     = (state.EvoStage and state.EvoStage[abilityName]) or 0,
+        })
     end
 
     -- PoisonCoat: tick down stacks on attack abilities
@@ -809,6 +1113,11 @@ if ActivateAwakeningEvt then
         end)
 
         print(("[CombatSystem] %s activated: %s"):format(player.Name, awData.Name))
+        -- Notify MetaProgression for bounty tracking (lazy require to avoid circular deps)
+        local ok, MetaProg = pcall(require, script.Parent.MetaProgression)
+        if ok and MetaProg and MetaProg.TrackBountyEvent then
+            MetaProg.TrackBountyEvent(player, "AwakeningActivated", {})
+        end
     end)
 end
 
@@ -825,16 +1134,25 @@ end
 function CombatSystem.InitPlayer(player, archetypeName, level)
     local state = PlayerState[player]
     if not state then return end
+    local oldArchetype = state.Stats and state.Stats.Archetype
     state.Stats = CharacterStats.BuildStats(archetypeName, level)
     state.HP = state.Stats.MaxHP
     state.MP = state.Stats.MaxMP
     state.NightVeilReady  = (archetypeName == "Assassin")
     state.AwakeningGauge  = 0
+    state.ComboCount      = 0
+    state.LastHitTime     = 0
+    state.IsDead          = false
+    state.EvoXP           = {}
+    state.EvoStage        = {}
+    state.VoidStacks      = 0
+    state.LastUsedAbility = nil
     state.Buffs["AwakeningActive"] = nil  -- clear any lingering awakening on re-init
 
-    -- On first init (or archetype change), reset known + active abilities.
-    -- On respawn (same archetype, level > 1), preserve what the player had.
-    local isFirstInit = #state.KnownAbilities == 0
+    -- Reset known + active abilities on first init OR when archetype changes.
+    -- On respawn with the same archetype (level > 1), preserve earned abilities.
+    local archetypeChanged = oldArchetype ~= archetypeName
+    local isFirstInit = #state.KnownAbilities == 0 or archetypeChanged
     if isFirstInit then
         state.KnownAbilities = table.clone(state.Stats.Abilities)
         state.ActiveSlots = { false, false, false, false, false }

@@ -2,28 +2,26 @@
 -- Captures keyboard input for ability use and sends to server.
 -- Blocks ability input while the Ability Book panel is open.
 
-local Players           = game:GetService("Players")
-local UserInputService  = game:GetService("UserInputService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService        = game:GetService("RunService")
+local Players               = game:GetService("Players")
+local UserInputService      = game:GetService("UserInputService")
+local ReplicatedStorage     = game:GetService("ReplicatedStorage")
+local RunService            = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 
 local RemoteEvents = ReplicatedStorage:WaitForChild("RemoteEvents")
 local UseAbility   = RemoteEvents:WaitForChild("UseAbility")
 
--- Active slots: Q/E/R/F/T = slots 1-5
+-- Ability slots: number keys 1-5
 local KeyBindings = {
-    [Enum.KeyCode.Q] = 1,
-    [Enum.KeyCode.E] = 2,
-    [Enum.KeyCode.R] = 3,
-    [Enum.KeyCode.F] = 4,
-    [Enum.KeyCode.T] = 5,
+    [Enum.KeyCode.One]   = 1,
+    [Enum.KeyCode.Two]   = 2,
+    [Enum.KeyCode.Three] = 3,
+    [Enum.KeyCode.Four]  = 4,
+    [Enum.KeyCode.Five]  = 5,
 }
 
--- Client-side cooldown tracking (visual only; server enforces real CDs)
-local ClientCooldowns = {}  -- [slotIndex] = endTime
-local ActiveSlots     = {}  -- [slotIndex] = abilityName (populated from UpdateHUD)
+local ActiveSlots = {}  -- [slotIndex] = abilityName (populated from UpdateHUD)
 
 local function isAbilityBookOpen()
     local gui = player.PlayerGui:FindFirstChild("HUD")
@@ -63,26 +61,17 @@ local function getAimDirection()
     return { X = dir.X, Y = dir.Y, Z = dir.Z }
 end
 
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed or isAbilityBookOpen() then return end
-
-    local slot = KeyBindings[input.KeyCode]
-    if not slot then return end
-
+local function fireAbilitySlot(slot)
     local abilityName = ActiveSlots[slot]
     if not abilityName then return end
-
-    -- Client-side cooldown gate (visual only)
-    local now = tick()
-    if ClientCooldowns[slot] and now < ClientCooldowns[slot] then return end
-
     UseAbility:FireServer(abilityName, getTargetEnemy(), getAimDirection())
+end
 
-    -- Approximate local cooldown until server confirms
-    local AbilitySystem = require(ReplicatedStorage.Modules.AbilitySystem)
-    local ab = AbilitySystem.GetAbility(abilityName)
-    if ab and ab.Cooldown > 0 then
-        ClientCooldowns[slot] = now + ab.Cooldown
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed or isAbilityBookOpen() then return end
+    local slot = KeyBindings[input.KeyCode]
+    if slot then
+        fireAbilitySlot(slot)
     end
 end)
 

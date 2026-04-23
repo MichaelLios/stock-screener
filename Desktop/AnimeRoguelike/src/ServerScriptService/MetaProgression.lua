@@ -36,10 +36,12 @@ local MetaProgression = {}
 -- ────────────────────────────────────────────────
 
 MetaProgression.Passives = {
+    -- ── TIER 1: Stat improvements ─────────────────────────────────────────
     {
         Id          = "BonusHP",
         Name        = "Survivor's Spirit",
-        Description = "Start every run with +10% Max HP.",
+        Category    = "Stat",
+        Description = "Start every run with +10% Max HP per level.",
         Cost        = 100,
         MaxLevel    = 3,
         Apply = function(stats, level)
@@ -49,7 +51,8 @@ MetaProgression.Passives = {
     {
         Id          = "BonusDamage",
         Name        = "Battle-Hardened",
-        Description = "Start every run with +5 Attack.",
+        Category    = "Stat",
+        Description = "Start every run with +5 Attack per level.",
         Cost        = 120,
         MaxLevel    = 4,
         Apply = function(stats, level)
@@ -59,7 +62,8 @@ MetaProgression.Passives = {
     {
         Id          = "LootFortune",
         Name        = "Fortune's Hand",
-        Description = "Loot drop quality improved (rare+ items more common).",
+        Category    = "Stat",
+        Description = "Loot drop quality improved (+15% rare-item chance per level).",
         Cost        = 150,
         MaxLevel    = 2,
         Apply = function(stats, level)
@@ -69,7 +73,8 @@ MetaProgression.Passives = {
     {
         Id          = "CritEdge",
         Name        = "Killer Insight",
-        Description = "Start every run with +3% global critical hit chance.",
+        Category    = "Stat",
+        Description = "Start every run with +3% global critical hit chance per level.",
         Cost        = 180,
         MaxLevel    = 3,
         Apply = function(stats, level)
@@ -79,6 +84,7 @@ MetaProgression.Passives = {
     {
         Id          = "CooldownMastery",
         Name        = "Technique Mastery",
+        Category    = "Stat",
         Description = "All ability cooldowns reduced by 5% per level.",
         Cost        = 200,
         MaxLevel    = 3,
@@ -89,11 +95,88 @@ MetaProgression.Passives = {
     {
         Id          = "StartingGold",
         Name        = "Pirate Legacy",
-        Description = "Start every run with +50 Bounty.",
+        Category    = "Stat",
+        Description = "Start every run with +50 Bounty (gold) per level.",
         Cost        = 80,
         MaxLevel    = 4,
         Apply = function(stats, level)
             stats.BonusStartGold = (stats.BonusStartGold or 0) + level * 50
+        end,
+    },
+
+    -- ── TIER 2: Content unlocks ───────────────────────────────────────────
+    -- These change WHAT is available, not just numbers.
+    {
+        Id          = "ShardMemoryBonus",
+        Name        = "Shard Memory",
+        Category    = "Content",
+        Description = "Unlock additional Event room outcomes: Ancient Blessing and Void Whisper.",
+        UnlockLore  = "You've read enough Shards to recognize the echoes they leave behind.",
+        Cost        = 175,
+        MaxLevel    = 1,
+        Apply = function(stats, level)
+            stats.UnlockShardMemoryEvents = true
+        end,
+    },
+    {
+        Id          = "CurseExpertise",
+        Name        = "Curse Expertise",
+        Category    = "Content",
+        Description = "Sealed Chamber rooms offer a third Curse option instead of two.",
+        UnlockLore  = "You've accepted enough Void bargains to recognize a good deal.",
+        Cost        = 220,
+        MaxLevel    = 1,
+        Apply = function(stats, level)
+            stats.SealedChamberExtraOption = true
+        end,
+    },
+    {
+        Id          = "BountyVeteran",
+        Name        = "Coalition Veteran",
+        Category    = "Content",
+        Description = "Bounty Board refreshes with one guaranteed Tier 3 contract instead of weighted random.",
+        UnlockLore  = "Your track record earns access to high-priority contracts.",
+        Cost        = 250,
+        MaxLevel    = 1,
+        Apply = function(stats, level)
+            stats.GuaranteedTier3Bounty = true
+        end,
+    },
+    {
+        Id          = "ShrineMastery",
+        Name        = "Shrine Sensitivity",
+        Category    = "Content",
+        Description = "Shrines now offer 4 options instead of 3. Ancient Blessing has a reduced gold cost.",
+        UnlockLore  = "Your resonance is strong enough to read the older shrines more clearly.",
+        Cost        = 300,
+        MaxLevel    = 1,
+        Apply = function(stats, level)
+            stats.ShrineExtraOption = true
+            stats.AncientBlessingCostMult = 0.70   -- 30% cheaper
+        end,
+    },
+    {
+        Id          = "OriginUnlock",
+        Name        = "Deep Resonance",
+        Category    = "Content",
+        Description = "Unlock one additional Origin per archetype (the 3rd Origin for each becomes available).",
+        UnlockLore  = "You've been through enough to understand who you really are in these Shards.",
+        Cost        = 400,
+        MaxLevel    = 1,
+        Apply = function(stats, level)
+            stats.UnlockTier2Origins = true
+        end,
+    },
+    {
+        Id          = "AwakeningBoost",
+        Name        = "Resonance Overflow",
+        Category    = "Content",
+        Description = "Awakening duration increased by 3 seconds for all archetypes.",
+        UnlockLore  = "The resonance inside you has grown past what it was designed to hold.",
+        Cost        = 350,
+        MaxLevel    = 2,
+        Apply = function(stats, level)
+            stats.AwakeningDurationBonus = (stats.AwakeningDurationBonus or 0) + level * 3
         end,
     },
 }
@@ -105,10 +188,31 @@ MetaProgression.Passives = {
 local PlayerMeta = {}   -- [player] = { MasteryPoints, TotalRuns, BestFloor, Unlocked = {[id] = level} }
 
 local DEFAULT_META = {
-    MasteryPoints = 0,
-    TotalRuns     = 0,
-    BestFloor     = 0,
-    Unlocked      = {},   -- { [passiveId] = level }
+    MasteryPoints  = 0,
+    TotalRuns      = 0,
+    BestFloor      = 0,
+    Unlocked       = {},   -- { [passiveId] = level }
+    -- Bounty system
+    ActiveBounties    = {},  -- { [bountyId] = { progress = N } }
+    CompletedBounties = {},  -- { [bountyId] = true }
+    BossesDefeated    = {},  -- { [bossKey] = N }
+    UnlockedOrigins   = {},  -- { [originId] = true }
+    -- Achievement + cosmetic unlock tracking
+    CompletedAchievements = {},  -- { [achievementKey] = true }
+    -- Collectible lore fragments
+    CollectedLore = {},          -- { [loreId] = true }
+    -- Per-run challenge history
+    CompletedChallenges = {},    -- { [challengeId] = count }
+    -- Lifetime stats for leaderboard / achievements
+    TotalStats = {
+        TotalDamageDealt = 0,
+        TotalKills       = 0,
+        TotalGoldEarned  = 0,
+        BossesDefeated   = 0,
+        AwakenActivations = 0,
+    },
+    -- Personalization: last chosen starting bonus
+    LastBonusId = "None",
 }
 
 local function deepCopy(t)
@@ -277,6 +381,201 @@ MetaUpgradeEvt.OnServerEvent:Connect(function(player, passiveId)
         Duration = 3,
     })
 end)
+
+-- ────────────────────────────────────────────────
+-- BOUNTY SYSTEM
+-- ────────────────────────────────────────────────
+
+local BountyData = require(ReplicatedStorage.Modules.BountyData)
+
+-- Give a player a starting set of active bounties if they have none
+local function ensureBounties(meta)
+    if next(meta.ActiveBounties) == nil then
+        local opts = BountyData.GenerateBoardOptions()
+        for _, b in ipairs(opts) do
+            -- Take up to MaxActive
+            local count = 0
+            for _ in pairs(meta.ActiveBounties) do count = count + 1 end
+            if count < BountyData.BoardConfig.MaxActive then
+                meta.ActiveBounties[b.Id] = { Progress = 0 }
+            end
+        end
+    end
+end
+
+-- Reset PerRun bounty progress at the start of each run
+function MetaProgression.ResetPerRunBountyProgress(player)
+    local meta = PlayerMeta[player]
+    if not meta then return end
+    for bountyId in pairs(meta.ActiveBounties) do
+        local b = BountyData.GetById(bountyId)
+        if b and b.Condition.Scope == "PerRun" then
+            meta.ActiveBounties[bountyId].Progress = 0
+        end
+    end
+end
+
+-- Process a game event against the player's active bounties
+-- eventName matches Condition.Event strings in BountyData
+-- data carries context (Floor, BossKey, Gold, etc.)
+function MetaProgression.TrackBountyEvent(player, eventName, data)
+    local meta = PlayerMeta[player]
+    if not meta then return end
+    ensureBounties(meta)
+    data = data or {}
+
+    local activeBountyIds = {}
+    for id in pairs(meta.ActiveBounties) do table.insert(activeBountyIds, id) end
+
+    local matches = BountyData.CheckProgress(activeBountyIds, eventName, data)
+    local completedNames = {}
+
+    for _, match in ipairs(matches) do
+        local entry = meta.ActiveBounties[match.BountyId]
+        if not entry then continue end
+
+        entry.Progress = (entry.Progress or 0) + 1
+
+        if entry.Progress >= match.Threshold then
+            -- Bounty completed
+            meta.ActiveBounties[match.BountyId] = nil
+            meta.CompletedBounties[match.BountyId] = true
+
+            local b = BountyData.GetById(match.BountyId)
+            if b then table.insert(completedNames, b.Name) end
+
+            -- Award reward
+            local reward = match.Reward
+            if reward then
+                if reward.Type == "Gold" then
+                    -- Credit gold to current run state via UpdateHUD
+                    UpdateHUD:FireClient(player, {
+                        Gold    = reward.Amount,  -- GameManager adds this on next HUD push
+                        Message = "Bounty Complete: +" .. reward.Amount .. " Bounty!",
+                        Duration = 4,
+                    })
+                elseif reward.Type == "MasteryPoints" then
+                    meta.MasteryPoints = meta.MasteryPoints + reward.Amount
+                    UpdateHUD:FireClient(player, {
+                        Message  = "Bounty Complete: +" .. reward.Amount .. " Mastery Points!",
+                        Duration = 4,
+                    })
+                elseif reward.Type == "UnlockOrigin" and reward.OriginId then
+                    meta.UnlockedOrigins[reward.OriginId] = true
+                    UpdateHUD:FireClient(player, {
+                        Message  = "Origin Unlocked: " .. reward.OriginId,
+                        Duration = 5,
+                    })
+                end
+            end
+
+            -- Replace completed bounty with a new one from the board
+            local opts = BountyData.GenerateBoardOptions()
+            for _, newB in ipairs(opts) do
+                if not meta.ActiveBounties[newB.Id] and not meta.CompletedBounties[newB.Id] then
+                    meta.ActiveBounties[newB.Id] = { Progress = 0 }
+                    break
+                end
+            end
+        end
+    end
+
+    if #completedNames > 0 then
+        saveMeta(player)
+        syncToClient(player)
+    end
+end
+
+-- Track total runs (call on run end/death)
+function MetaProgression.TrackRunCompleted(player)
+    MetaProgression.TrackBountyEvent(player, "RunCompleted", {})
+end
+
+-- ────────────────────────────────────────────────
+-- ACHIEVEMENT & COSMETIC UNLOCK TRACKING
+-- ────────────────────────────────────────────────
+
+-- Mark an achievement as completed; triggers CosmeticsSystem notification.
+function MetaProgression.TrackAchievement(player, achievementKey)
+    local meta = PlayerMeta[player]
+    if not meta then return end
+    if meta.CompletedAchievements[achievementKey] then return end  -- already unlocked
+    meta.CompletedAchievements[achievementKey] = true
+    saveMeta(player)
+    syncToClient(player)
+    -- Let CosmeticsSystem know so it can re-sync
+    local ok, CosmeticsSystem = pcall(require, script.Parent.CosmeticsSystem)
+    if ok and CosmeticsSystem and CosmeticsSystem.OnAchievementUnlocked then
+        CosmeticsSystem.OnAchievementUnlocked(player, achievementKey)
+    end
+end
+
+-- ────────────────────────────────────────────────
+-- LORE FRAGMENT COLLECTION
+-- ────────────────────────────────────────────────
+
+function MetaProgression.CollectLore(player, loreId)
+    local meta = PlayerMeta[player]
+    if not meta then return false end
+    if meta.CollectedLore[loreId] then return false end  -- already collected
+    meta.CollectedLore[loreId] = true
+    saveMeta(player)
+    if UpdateHUD then
+        UpdateHUD:FireClient(player, {
+            Message  = "📖 Lore Fragment Collected!",
+            SubText  = "Check the Codex in the lobby.",
+            Duration = 4,
+            Color    = Color3.fromRGB(200, 160, 255),
+        })
+    end
+    -- Track achievement if all fragments in a theme collected (check elsewhere)
+    syncToClient(player)
+    return true
+end
+
+function MetaProgression.GetCollectedLore(player)
+    local meta = PlayerMeta[player]
+    return meta and meta.CollectedLore or {}
+end
+
+-- ────────────────────────────────────────────────
+-- LIFETIME STATS TRACKING
+-- ────────────────────────────────────────────────
+
+function MetaProgression.TrackStats(player, statsToAdd)
+    local meta = PlayerMeta[player]
+    if not meta then return end
+    local ts = meta.TotalStats
+    for k, v in pairs(statsToAdd) do
+        ts[k] = (ts[k] or 0) + v
+    end
+    -- Trigger achievements based on milestones
+    if ts.TotalKills >= 100 and not meta.CompletedAchievements["VoidStacks20"] then
+        MetaProgression.TrackAchievement(player, "VoidStacks20")
+    end
+    if ts.BossesDefeated >= 1 and not meta.CompletedAchievements["ClearShadowGate"] then
+        -- actual ShadowGate check is done in GameManager; this is a fallback
+    end
+end
+
+-- ────────────────────────────────────────────────
+-- CHALLENGE COMPLETION TRACKING
+-- ────────────────────────────────────────────────
+
+function MetaProgression.RecordChallengeComplete(player, challengeId)
+    local meta = PlayerMeta[player]
+    if not meta then return end
+    meta.CompletedChallenges[challengeId] = (meta.CompletedChallenges[challengeId] or 0) + 1
+    saveMeta(player)
+end
+
+-- ────────────────────────────────────────────────
+-- STATE ACCESS (for CosmeticsSystem, ChallengeTracker)
+-- ────────────────────────────────────────────────
+
+function MetaProgression.GetState(player)
+    return PlayerMeta[player]
+end
 
 print("[MetaProgression] Loaded.")
 

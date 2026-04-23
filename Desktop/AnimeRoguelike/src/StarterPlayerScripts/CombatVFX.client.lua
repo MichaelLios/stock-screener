@@ -843,4 +843,263 @@ if AwakeningStateVFX then
     end)
 end
 
+-- ────────────────────────────────────────────────
+-- STATUS EFFECT VISUALS
+-- ────────────────────────────────────────────────
+-- Server fires StatusApplied { TargetId, StatusType, Duration } when a debuff lands.
+-- We attach persistent particle/part effects to the enemy model for the debuff's duration.
+
+local StatusAppliedEvt = RemoteEvents:WaitForChild("StatusApplied", 15)
+
+-- Active status effect cleanup handles: [enemyId][statusType] = cancelFn
+local activeStatusFX = {}
+
+local STATUS_CFG = {
+    Burn    = { color = Color3.fromRGB(255, 90,  20), style = "smoke",   rate = 18 },
+    Poison  = { color = Color3.fromRGB(80,  220, 30), style = "drip",    rate = 14 },
+    Freeze  = { color = Color3.fromRGB(160, 230, 255),style = "crystal", rate = 0  },
+    Stun    = { color = Color3.fromRGB(255, 240, 60), style = "stars",   rate = 22 },
+    Slow    = { color = Color3.fromRGB(150, 150, 200),style = "wisp",    rate = 10 },
+    DeathMark = { color = Color3.fromRGB(180, 10, 10), style = "smoke",  rate = 8  },
+}
+
+local function cancelStatusFX(enemyId, statusType)
+    if not activeStatusFX[enemyId] then return end
+    local cancel = activeStatusFX[enemyId][statusType]
+    if cancel then cancel() end
+    activeStatusFX[enemyId][statusType] = nil
+end
+
+local function applyStatusFX(model, statusType, duration, cfg)
+    local root = model and (model.PrimaryPart
+        or model:FindFirstChild("HumanoidRootPart")
+        or model:FindFirstChildWhichIsA("BasePart"))
+    if not root then return end
+
+    local alive = true
+    local parts  = {}
+
+    local function cleanup()
+        alive = false
+        for _, p in ipairs(parts) do
+            pcall(function()
+                TweenService:Create(p, TweenInfo.new(0.3), { Transparency = 1 }):Play()
+                Debris:AddItem(p, 0.35)
+            end)
+        end
+    end
+
+    if cfg.style == "crystal" then
+        -- Freeze: place 5 blue crystal spikes around the model's feet
+        for i = 1, 5 do
+            local angle = (i / 5) * math.pi * 2
+            local cx = root.Position.X + math.cos(angle) * 1.8
+            local cz = root.Position.Z + math.sin(angle) * 1.8
+            local spike = Instance.new("Part")
+            spike.Size        = Vector3.new(0.5, 0, 0.5)
+            spike.Color       = cfg.color
+            spike.Material    = Enum.Material.Neon
+            spike.Transparency = 0.2
+            spike.Anchored    = true
+            spike.CanCollide  = false
+            spike.CFrame      = CFrame.new(cx, root.Position.Y - root.Size.Y * 0.4, cz)
+                * CFrame.Angles(math.random() * 0.3, math.random() * math.pi * 2, 0)
+            spike.Parent      = workspace
+            table.insert(parts, spike)
+            TweenService:Create(spike, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                Size = Vector3.new(0.5, math.random(2, 4) + 0.5, 0.5),
+            }):Play()
+            Debris:AddItem(spike, duration + 0.4)
+        end
+        -- PointLight tint
+        local iceLight = Instance.new("PointLight")
+        iceLight.Color      = cfg.color
+        iceLight.Brightness = 3
+        iceLight.Range      = 14
+        iceLight.Parent     = root
+        table.insert(parts, iceLight)
+        Debris:AddItem(iceLight, duration)
+
+    elseif cfg.style == "stars" then
+        -- Stun: ring of yellow stars orbiting the head
+        local headPos = root.Position + Vector3.new(0, root.Size.Y * 0.5 + 2.5, 0)
+        local startTime = os.clock()
+        local starParts = {}
+        for i = 1, 4 do
+            local star = Instance.new("Part")
+            star.Shape       = Enum.PartType.Ball
+            star.Size        = Vector3.new(0.5, 0.5, 0.5)
+            star.Color       = cfg.color
+            star.Material    = Enum.Material.Neon
+            star.Anchored    = true
+            star.CanCollide  = false
+            star.Parent      = workspace
+            table.insert(starParts, star)
+            table.insert(parts, star)
+            Debris:AddItem(star, duration + 0.35)
+        end
+        local conn = RunService.Heartbeat:Connect(function()
+            if not alive then return end
+            local t = os.clock() - startTime
+            local basePos = root and root.Parent and root.Position
+                or headPos
+            for i, star in ipairs(starParts) do
+                if star.Parent then
+                    local a = (i / #starParts) * math.pi * 2 + t * 3.5
+                    star.Position = (basePos + Vector3.new(0, root.Size.Y * 0.5 + 2.5, 0))
+                        + Vector3.new(math.cos(a) * 2.2, math.sin(t * 4 + i) * 0.4, math.sin(a) * 2.2)
+                end
+            end
+        end)
+        table.insert(parts, { Destroy = function() conn:Disconnect() end, Parent = nil })
+
+    else
+        -- Particle emitter for smoke/drip/wisp styles
+        local emitter = Instance.new("ParticleEmitter")
+        emitter.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0,   cfg.color),
+            ColorSequenceKeypoint.new(0.5, Color3.new(1, 1, 1)),
+            ColorSequenceKeypoint.new(1,   cfg.color),
+        })
+        emitter.LightEmission  = 0.7
+        emitter.LightInfluence = 0.3
+        emitter.Size = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.4),
+            NumberSequenceKeypoint.new(0.5, 0.25),
+            NumberSequenceKeypoint.new(1, 0),
+        })
+        emitter.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.2),
+            NumberSequenceKeypoint.new(0.8, 0.65),
+            NumberSequenceKeypoint.new(1, 1),
+        })
+        emitter.Rate        = cfg.rate
+        emitter.Lifetime    = NumberRange.new(0.5, 1.2)
+        emitter.Speed       = NumberRange.new(2, 5)
+        emitter.SpreadAngle = Vector2.new(30, 30)
+        emitter.Parent      = root
+        table.insert(parts, emitter)
+
+        task.delay(duration, function()
+            if emitter.Parent then
+                emitter.Enabled = false
+                Debris:AddItem(emitter, 1.5)
+            end
+        end)
+    end
+
+    task.delay(duration + 0.05, cleanup)
+    return cleanup
+end
+
+if StatusAppliedEvt then
+    StatusAppliedEvt.OnClientEvent:Connect(function(data)
+        if not data.TargetId or not data.StatusType then return end
+        local cfg = STATUS_CFG[data.StatusType]
+        if not cfg then return end
+
+        local model = enemyById[data.TargetId]
+        if not model then return end
+
+        local eid = data.TargetId
+        if not activeStatusFX[eid] then activeStatusFX[eid] = {} end
+
+        -- Cancel existing FX of same type first
+        cancelStatusFX(eid, data.StatusType)
+
+        local cancelFn = applyStatusFX(model, data.StatusType, data.Duration or 3, cfg)
+        if cancelFn then
+            activeStatusFX[eid][data.StatusType] = cancelFn
+        end
+    end)
+end
+
+-- Clean up status FX when an enemy dies
+workspace.DescendantRemoving:Connect(function(obj)
+    if obj:IsA("Model") and obj:GetAttribute("IsEnemy") then
+        local id = obj:GetAttribute("EnemyId")
+        if id and activeStatusFX[id] then
+            for _, cancel in pairs(activeStatusFX[id]) do
+                pcall(cancel)
+            end
+            activeStatusFX[id] = nil
+        end
+    end
+end)
+
+-- ────────────────────────────────────────────────
+-- COSMETIC TITLE DISPLAY (CosmeticSync)
+-- ────────────────────────────────────────────────
+-- When any player equips a title, render it as a BillboardGui above their head.
+
+local CosmeticSyncEvt = RemoteEvents:WaitForChild("CosmeticSync", 15)
+local CosmeticsData   = require(ReplicatedStorage.Modules.CosmeticsData)
+
+local titleBoards = {}  -- [userId] = BillboardGui
+
+local function updateTitleBoard(targetPlayer, titleKey)
+    local char = targetPlayer.Character
+    if not char then return end
+    local head = char:FindFirstChild("Head")
+    if not head then return end
+
+    local uid = targetPlayer.UserId
+
+    -- Remove old
+    if titleBoards[uid] and titleBoards[uid].Parent then
+        titleBoards[uid]:Destroy()
+    end
+
+    if not titleKey or titleKey == "" then return end
+    local titleData = CosmeticsData.Titles[titleKey]
+    if not titleData then return end
+
+    local bg = Instance.new("BillboardGui")
+    bg.Size         = UDim2.new(0, 200, 0, 32)
+    bg.StudsOffset  = Vector3.new(0, 3.2, 0)
+    bg.MaxDistance  = 60
+    bg.AlwaysOnTop  = false
+    bg.Adornee      = head
+    bg.Parent       = char
+
+    local fr = Instance.new("Frame")
+    fr.Size                  = UDim2.new(1, 0, 1, 0)
+    fr.BackgroundColor3      = Color3.fromRGB(5, 5, 12)
+    fr.BackgroundTransparency = 0.3
+    fr.BorderSizePixel       = 0
+    fr.Parent                = bg
+    Instance.new("UICorner", fr).CornerRadius = UDim.new(0, 6)
+    local stroke = Instance.new("UIStroke", fr)
+    stroke.Color     = titleData.Color
+    stroke.Thickness = 1.2
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size                  = UDim2.new(1, -4, 1, 0)
+    lbl.Position              = UDim2.new(0, 2, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text                  = titleData.DisplayName
+    lbl.TextColor3            = titleData.Color
+    lbl.TextScaled            = true
+    lbl.Font                  = Enum.Font.GothamBold
+    lbl.TextStrokeTransparency = 0.45
+    lbl.Parent                = fr
+
+    titleBoards[uid] = bg
+end
+
+if CosmeticSyncEvt then
+    CosmeticSyncEvt.OnClientEvent:Connect(function(data)
+        if data.Error then return end
+        -- Find the player
+        for _, p in ipairs(game:GetService("Players"):GetPlayers()) do
+            if p.UserId == data.UserId then
+                if data.Title then
+                    updateTitleBoard(p, data.Title)
+                end
+                break
+            end
+        end
+    end)
+end
+
 print("[CombatVFX] Loaded.")

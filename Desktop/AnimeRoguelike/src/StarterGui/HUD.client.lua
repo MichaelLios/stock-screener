@@ -1,9 +1,10 @@
 -- HUD.client.lua
--- Sailor Piece-style UI: dark stone panels, amber-gold accents, red HP, blue Haki.
+-- Dungeon Piece UI: dark stone panels, amber-gold accents, red HP, blue Energy.
 
 local Players           = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService      = game:GetService("TweenService")
+local RunService        = game:GetService("RunService")
 
 local player    = Players.LocalPlayer
 local playerGui = player.PlayerGui
@@ -59,10 +60,7 @@ overlayLabel.Font = Enum.Font.GothamBold
 overlayLabel.ZIndex = 21
 overlayLabel.Parent = overlay
 -- Amber bottom border stripe on overlay text
-local overlayStroke = Instance.new("UIStroke")
-overlayStroke.Color = C.Amber
-overlayStroke.Thickness = 2
-overlayStroke.Parent = overlayLabel
+do local s = Instance.new("UIStroke"); s.Color=C.Amber; s.Thickness=2; s.Parent=overlayLabel end
 
 -- ── Stat bars helper ─────────────────────────────────────────────────────────
 -- Returns: panelFrame, fillFrame, textLabel
@@ -120,9 +118,9 @@ local function makeBar(parent, yOffset, fillColor, labelPrefix, name, w, h)
     return panel, fill, txt
 end
 
--- HP and Haki bars (bottom-left)
-local hpFrame,   hpFill,   hpLabel   = makeBar(hudGui, -86, C.HPFull,   "HP",   "HPBar",   300, 30)
-local mpFrame,   mpFill,   mpLabel   = makeBar(hudGui, -50, C.HakiFull, "Haki", "MPBar",   300, 30)
+-- HP and Energy bars (bottom-left)
+local hpFrame,   hpFill,   hpLabel   = makeBar(hudGui, -86, C.HPFull,   "HP",     "HPBar",   300, 30)
+local mpFrame,   mpFill,   mpLabel   = makeBar(hudGui, -50, C.HakiFull, "Energy", "MPBar",   300, 30)
 
 -- ── XP bar (thin strip at very bottom) ──
 local xpTrack = Instance.new("Frame")
@@ -178,20 +176,52 @@ floorBG.BorderSizePixel = 0
 floorBG.ZIndex = 5
 floorBG.Parent = hudGui
 Instance.new("UICorner", floorBG).CornerRadius = UDim.new(0, 10)
-local floorStroke = Instance.new("UIStroke", floorBG)
-floorStroke.Color = C.Amber
-floorStroke.Thickness = 1.5
+do local s = Instance.new("UIStroke", floorBG); s.Color=C.Amber; s.Thickness=1.5 end
 
 local floorLabel = Instance.new("TextLabel")
 floorLabel.Name = "FloorLabel"
 floorLabel.Size = UDim2.new(1, -8, 1, 0)
 floorLabel.BackgroundTransparency = 1
-floorLabel.Text = "Grand Line — Floor 1"
+floorLabel.Text = "Dungeon Piece — Floor 1"
 floorLabel.TextColor3 = C.AmberLight
 floorLabel.TextScaled = true
 floorLabel.Font = Enum.Font.GothamBold
 floorLabel.ZIndex = 6
 floorLabel.Parent = floorBG
+
+-- ── Room progression bar (below floor label at top center) ──
+local roomProgressBG = Instance.new("Frame")
+roomProgressBG.Name = "RoomProgressBG"
+roomProgressBG.Size = UDim2.new(0, 280, 0, 18)
+roomProgressBG.Position = UDim2.new(0.5, -140, 0, 52)
+roomProgressBG.BackgroundColor3 = Color3.fromRGB(14, 11, 8)
+roomProgressBG.BackgroundTransparency = 0.2
+roomProgressBG.BorderSizePixel = 0
+roomProgressBG.ZIndex = 5
+roomProgressBG.Visible = false
+roomProgressBG.Parent = hudGui
+Instance.new("UICorner", roomProgressBG).CornerRadius = UDim.new(0, 8)
+do local s = Instance.new("UIStroke", roomProgressBG); s.Color=C.PanelBorder; s.Thickness=1 end
+
+local roomProgressFill = Instance.new("Frame")
+roomProgressFill.Name = "Fill"
+roomProgressFill.Size = UDim2.new(0, 0, 1, 0)
+roomProgressFill.BackgroundColor3 = C.Amber
+roomProgressFill.BorderSizePixel = 0
+roomProgressFill.ZIndex = 6
+roomProgressFill.Parent = roomProgressBG
+Instance.new("UICorner", roomProgressFill).CornerRadius = UDim.new(0, 8)
+
+local roomProgressLabel = Instance.new("TextLabel")
+roomProgressLabel.Name = "RoomProgressLabel"
+roomProgressLabel.Size = UDim2.new(1, 0, 1, 0)
+roomProgressLabel.BackgroundTransparency = 1
+roomProgressLabel.Text = "Rooms  0 / 0"
+roomProgressLabel.TextColor3 = C.TextMain
+roomProgressLabel.TextScaled = true
+roomProgressLabel.Font = Enum.Font.Gotham
+roomProgressLabel.ZIndex = 7
+roomProgressLabel.Parent = roomProgressBG
 
 -- ── Ability bar (bottom center) ──
 local abilityBar = Instance.new("Frame")
@@ -202,7 +232,7 @@ abilityBar.BackgroundTransparency = 1
 abilityBar.ZIndex = 5
 abilityBar.Parent = hudGui
 
-local abilityKeys = { "Q", "E", "R", "F", "T" }
+local abilityKeys = { "1", "2", "3", "4", "5" }
 local abilitySlotFrames = {}
 
 for i, key in ipairs(abilityKeys) do
@@ -281,7 +311,7 @@ lootNotif.ZIndex = 10
 lootNotif.Parent = hudGui
 
 -- ────────────────────────────────────────────────
--- ARCHETYPE SELECTION SCREEN  (Sailor Piece style)
+-- ARCHETYPE SELECTION SCREEN
 -- ────────────────────────────────────────────────
 
 local archetypeScreen = Instance.new("Frame")
@@ -320,15 +350,13 @@ archTitle.TextScaled = true
 archTitle.Font = Enum.Font.GothamBold
 archTitle.ZIndex = 17
 archTitle.Parent = archetypeScreen
-local titleStroke = Instance.new("UIStroke", archTitle)
-titleStroke.Color = C.PanelBorder
-titleStroke.Thickness = 1
+do local s=Instance.new("UIStroke",archTitle); s.Color=C.PanelBorder; s.Thickness=1 end
 
 local archSubtitle = Instance.new("TextLabel")
 archSubtitle.Size = UDim2.new(0.6, 0, 0.04, 0)
 archSubtitle.Position = UDim2.new(0.2, 0, 0.11, 0)
 archSubtitle.BackgroundTransparency = 1
-archSubtitle.Text = "Your path on the Grand Line begins now"
+archSubtitle.Text = "Your path through the Dungeon Piece begins now"
 archSubtitle.TextColor3 = C.TextDim
 archSubtitle.TextScaled = true
 archSubtitle.Font = Enum.Font.Gotham
@@ -356,12 +384,9 @@ cardScroll.CanvasSize = UDim2.new(0, 0, 1, 0)
 cardScroll.ZIndex = 16
 cardScroll.Parent = archetypeScreen
 
-local cardLayout = Instance.new("UIListLayout", cardScroll)
-cardLayout.FillDirection = Enum.FillDirection.Horizontal
-cardLayout.Padding = UDim.new(0, 16)
-cardLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+do local l=Instance.new("UIListLayout",cardScroll); l.FillDirection=Enum.FillDirection.Horizontal; l.Padding=UDim.new(0,16); l.VerticalAlignment=Enum.VerticalAlignment.Center end
 
--- Archetype data with Sailor Piece / One Piece-inspired styling
+-- Archetype data
 local archetypeData = {
     {
         Name  = "Swordsman",
@@ -539,9 +564,7 @@ shopFrame.Visible = false
 shopFrame.ZIndex = 12
 shopFrame.Parent = hudGui
 Instance.new("UICorner", shopFrame).CornerRadius = UDim.new(0, 14)
-local shopStroke = Instance.new("UIStroke", shopFrame)
-shopStroke.Color = C.Amber
-shopStroke.Thickness = 2
+do local s=Instance.new("UIStroke",shopFrame); s.Color=C.Amber; s.Thickness=2 end
 
 -- Header stripe
 local shopHeader = Instance.new("Frame")
@@ -566,7 +589,7 @@ shopTitle.Parent = shopHeader
 
 local shopClose = Instance.new("TextButton")
 shopClose.Size = UDim2.new(0, 36, 0, 36)
-shopClose.Position = UDim2.new(1, -42, 0.5, -18)
+shopClose.Position = UDim2.new(1, -42, 0, 8)
 shopClose.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
 shopClose.Text = "✕"
 shopClose.TextColor3 = Color3.new(1, 1, 1)
@@ -731,6 +754,10 @@ UpdateHUD.OnClientEvent:Connect(function(data)
         archetypeScreen.BackgroundTransparency = 0
         archetypeScreen.Visible = true
     end
+    if data.HideArchetypeScreen then
+        TweenService:Create(archetypeScreen, TweenInfo.new(0.4, Enum.EasingStyle.Quad), { BackgroundTransparency = 1 }):Play()
+        task.delay(0.45, function() archetypeScreen.Visible = false end)
+    end
 
     -- HP bar
     if data.HP ~= nil and data.MaxHP ~= nil then
@@ -749,7 +776,7 @@ UpdateHUD.OnClientEvent:Connect(function(data)
         TweenService:Create(mpFill, TweenInfo.new(0.18), {
             Size = UDim2.new(pct, 0, 1, 0),
         }):Play()
-        mpLabel.Text = "Haki  " .. math.floor(data.MP) .. " / " .. data.MaxMP
+        mpLabel.Text = "Energy  " .. math.floor(data.MP) .. " / " .. data.MaxMP
     end
 
     -- XP bar
@@ -776,9 +803,13 @@ UpdateHUD.OnClientEvent:Connect(function(data)
         goldLabel.Text = "Bounty:  " .. data.Gold
     end
 
-    -- Floor label
+    -- Floor label + reset room progress bar
     if data.FloorStart then
-        floorLabel.Text = "Grand Line — Floor " .. data.Floor .. " · " .. data.ThemeName
+        floorLabel.Text = "Dungeon Piece — F" .. data.Floor .. " · " .. (data.ShardName or data.ThemeName)
+        roomProgressBG.Visible = true
+        roomProgressFill.Size = UDim2.new(0, 0, 1, 0)
+        roomProgressFill.BackgroundColor3 = C.Amber
+        roomProgressLabel.Text = "Rooms  0 / ?"
     end
 
     -- Ability slots (server sends ActiveSlots; handled again below for AbilityBook sync)
@@ -809,20 +840,23 @@ UpdateHUD.OnClientEvent:Connect(function(data)
     end
 
     if data.RestRoom then
-        showToast("Rested — HP and Haki restored!", Color3.fromRGB(10, 30, 20), 2)
+        showToast("Rested — HP and Energy restored!", Color3.fromRGB(10, 30, 20), 2)
     end
 
     if data.Revived then
         showToast("Phoenix Scroll activated!", Color3.fromRGB(100, 50, 0), 2.5)
     end
 
-    -- Floor start overlay
-    if data.FloorStart then
+    -- Floor start overlay (fallback: only fires when no EntryFlavor lore is present)
+    if data.FloorStart and not data.EntryFlavor then
         overlay.BackgroundColor3 = Color3.fromRGB(0, 5, 14)
         overlayLabel.TextColor3 = C.AmberLight
         overlay.BackgroundTransparency = 0
-        overlayLabel.Text = "Floor " .. data.Floor .. "\n" .. data.ThemeName
+        overlayLabel.TextTransparency = 0
+        overlayLabel.Text = "Floor " .. data.Floor .. "\n" .. (data.ShardName or data.ThemeName)
         TweenService:Create(overlay, TweenInfo.new(2.5, Enum.EasingStyle.Quad), { BackgroundTransparency = 1 }):Play()
+        TweenService:Create(overlayLabel, TweenInfo.new(2.5, Enum.EasingStyle.Quad), { TextTransparency = 1 }):Play()
+        task.delay(2.6, function() overlayLabel.Text = ""; overlayLabel.TextTransparency = 0 end)
     end
 
     if data.BossUnlocked then
@@ -844,11 +878,21 @@ UpdateHUD.OnClientEvent:Connect(function(data)
     end
 
     if data.GameOver then
-        overlay.BackgroundColor3 = Color3.fromRGB(10, 0, 0)
-        overlayLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+        overlay.BackgroundColor3  = Color3.fromRGB(10, 0, 0)
+        overlayLabel.TextColor3   = Color3.fromRGB(255, 80, 80)
         overlay.BackgroundTransparency = 0
+        overlayLabel.TextTransparency  = 0
         overlayLabel.Text = "DEFEATED\nYou reached Floor " .. (data.Floor or 1)
-        TweenService:Create(overlay, TweenInfo.new(3), { BackgroundTransparency = 0.05 }):Play()
+        -- Hold for 3s then fade so the lobby is visible on respawn
+        task.delay(3, function()
+            TweenService:Create(overlay, TweenInfo.new(1.5, Enum.EasingStyle.Quad), { BackgroundTransparency = 1 }):Play()
+            TweenService:Create(overlayLabel, TweenInfo.new(1.5), { TextTransparency = 1 }):Play()
+            task.delay(1.6, function()
+                overlayLabel.Text = ""
+                overlayLabel.TextTransparency = 0
+                overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+            end)
+        end)
     end
 
     -- Ability learned notification
@@ -913,9 +957,7 @@ abilityBook.Visible = false
 abilityBook.ZIndex = 22
 abilityBook.Parent = hudGui
 Instance.new("UICorner", abilityBook).CornerRadius = UDim.new(0, 14)
-local bookMainStroke = Instance.new("UIStroke", abilityBook)
-bookMainStroke.Color = C.Amber
-bookMainStroke.Thickness = 2
+do local s=Instance.new("UIStroke",abilityBook); s.Color=C.Amber; s.Thickness=2 end
 
 -- Header
 local bookHeader = Instance.new("Frame")
@@ -1001,7 +1043,7 @@ local function getAbCost(abilityName)
     if not abilityName then return "" end
     local ab = AbilitySystemMod.GetAbility(abilityName)
     if not ab then return "" end
-    return ab.MPCost > 0 and (ab.MPCost .. " Haki") or "Free"
+    return ab.MPCost > 0 and (ab.MPCost .. " Energy") or "Free"
 end
 
 -- Forward-declared so slot/card builders can call them
@@ -1164,9 +1206,7 @@ local knownGrid = Instance.new("UIGridLayout", knownScroll)
 knownGrid.CellSize = UDim2.new(0, 168, 0, 94)
 knownGrid.CellPadding = UDim2.new(0, 8, 0, 8)
 knownGrid.SortOrder = Enum.SortOrder.Name
-local knownPad = Instance.new("UIPadding", knownScroll)
-knownPad.PaddingLeft = UDim.new(0, 4)
-knownPad.PaddingTop = UDim.new(0, 4)
+do local p=Instance.new("UIPadding",knownScroll); p.PaddingLeft=UDim.new(0,4); p.PaddingTop=UDim.new(0,4) end
 
 local function isAbilityEquipped(abilityName)
     for _, slotAbility in ipairs(bookActiveSlots) do
@@ -1263,7 +1303,7 @@ local function buildAbilityCard(abilityName)
     local costTxt = Instance.new("TextLabel")
     costTxt.Size = UDim2.new(0.5, 0, 1, 0)
     costTxt.BackgroundTransparency = 1
-    costTxt.Text = ab.MPCost > 0 and (ab.MPCost .. " Haki") or "Free"
+    costTxt.Text = ab.MPCost > 0 and (ab.MPCost .. " Energy") or "Free"
     costTxt.TextColor3 = C.HakiFull
     costTxt.TextScaled = true
     costTxt.Font = Enum.Font.Gotham
@@ -1351,12 +1391,8 @@ synergyStrip.BorderSizePixel = 0
 synergyStrip.ZIndex = 22
 synergyStrip.Parent = abilityBook
 Instance.new("UICorner", synergyStrip).CornerRadius = UDim.new(0, 8)
-local synStripLayout = Instance.new("UIListLayout", synergyStrip)
-synStripLayout.FillDirection = Enum.FillDirection.Horizontal
-synStripLayout.Padding = UDim.new(0, 8)
-synStripLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-local synStripPad = Instance.new("UIPadding", synergyStrip)
-synStripPad.PaddingLeft = UDim.new(0, 6)
+do local l=Instance.new("UIListLayout",synergyStrip); l.FillDirection=Enum.FillDirection.Horizontal; l.Padding=UDim.new(0,8); l.VerticalAlignment=Enum.VerticalAlignment.Center end
+do local p=Instance.new("UIPadding",synergyStrip); p.PaddingLeft=UDim.new(0,6) end
 
 local synTitleLbl = Instance.new("TextLabel")
 synTitleLbl.Name = "SynTitle"
@@ -1481,9 +1517,7 @@ bossBarFrame.Visible = false
 bossBarFrame.ZIndex  = 8
 bossBarFrame.Parent  = hudGui
 Instance.new("UICorner", bossBarFrame).CornerRadius = UDim.new(0, 10)
-local bossBarStroke = Instance.new("UIStroke", bossBarFrame)
-bossBarStroke.Color = Color3.fromRGB(220, 30, 30)
-bossBarStroke.Thickness = 2
+do local s=Instance.new("UIStroke",bossBarFrame); s.Color=Color3.fromRGB(220,30,30); s.Thickness=2 end
 
 local bossNameLbl = Instance.new("TextLabel")
 bossNameLbl.Size  = UDim2.new(1, -12, 0.40, 0)
@@ -2500,11 +2534,11 @@ if MetaSyncEvt then
     end)
 end
 
--- Tab key toggles the panel
+-- L key toggles the Legacy panel (Tab is reserved for the Ability Book)
 local UserInputService = game:GetService("UserInputService")
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.Tab then
+    if input.KeyCode == Enum.KeyCode.L then
         legacyPanel.Visible = not legacyPanel.Visible
         if legacyPanel.Visible and legacyData and legacyData.Passives then
             rebuildLegacyPanel(legacyData)
@@ -2512,4 +2546,822 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
-print("[HUD] Loaded — Sailor Piece style.")
+-- ────────────────────────────────────────────────
+-- DUNGEON MECHANIC HUD INDICATOR  (top-left, below floor label)
+-- ────────────────────────────────────────────────
+
+local mechanicPanel = Instance.new("Frame")
+mechanicPanel.Name              = "MechanicPanel"
+mechanicPanel.Size              = UDim2.new(0, 280, 0, 26)
+mechanicPanel.Position          = UDim2.new(0, 16, 0, 54)
+mechanicPanel.BackgroundColor3  = Color3.fromRGB(10, 8, 18)
+mechanicPanel.BackgroundTransparency = 0.2
+mechanicPanel.BorderSizePixel   = 0
+mechanicPanel.Visible           = false
+mechanicPanel.ZIndex            = 5
+mechanicPanel.Parent            = hudGui
+Instance.new("UICorner", mechanicPanel).CornerRadius = UDim.new(0, 8)
+local mechStroke = Instance.new("UIStroke", mechanicPanel)
+mechStroke.Color     = Color3.fromRGB(120, 60, 200)
+mechStroke.Thickness = 1
+
+local mechanicLabel = Instance.new("TextLabel")
+mechanicLabel.Size              = UDim2.new(1, -8, 1, 0)
+mechanicLabel.Position          = UDim2.new(0, 4, 0, 0)
+mechanicLabel.BackgroundTransparency = 1
+mechanicLabel.Text              = ""
+mechanicLabel.TextColor3        = Color3.fromRGB(200, 160, 255)
+mechanicLabel.TextScaled        = true
+mechanicLabel.Font              = Enum.Font.Gotham
+mechanicLabel.TextXAlignment    = Enum.TextXAlignment.Left
+mechanicLabel.ZIndex            = 6
+mechanicLabel.Parent            = mechanicPanel
+
+-- ────────────────────────────────────────────────
+-- ACTIVE CURSE INDICATOR  (below awakening gauge, bottom-left)
+-- ────────────────────────────────────────────────
+
+local curseIndicator = Instance.new("Frame")
+curseIndicator.Name              = "CurseIndicator"
+curseIndicator.Size              = UDim2.new(0, 220, 0, 22)
+curseIndicator.Position          = UDim2.new(0, 16, 1, -218)
+curseIndicator.BackgroundColor3  = Color3.fromRGB(20, 5, 5)
+curseIndicator.BackgroundTransparency = 0.15
+curseIndicator.BorderSizePixel   = 0
+curseIndicator.Visible           = false
+curseIndicator.ZIndex            = 5
+curseIndicator.Parent            = hudGui
+Instance.new("UICorner", curseIndicator).CornerRadius = UDim.new(0, 8)
+local curseStroke = Instance.new("UIStroke", curseIndicator)
+curseStroke.Color     = Color3.fromRGB(200, 40, 40)
+curseStroke.Thickness = 1
+
+local curseLbl = Instance.new("TextLabel")
+curseLbl.Size              = UDim2.new(1, -8, 1, 0)
+curseLbl.Position          = UDim2.new(0, 4, 0, 0)
+curseLbl.BackgroundTransparency = 1
+curseLbl.Text              = ""
+curseLbl.TextColor3        = Color3.fromRGB(255, 120, 120)
+curseLbl.TextScaled        = true
+curseLbl.Font              = Enum.Font.GothamBold
+curseLbl.TextXAlignment    = Enum.TextXAlignment.Left
+curseLbl.ZIndex            = 6
+curseLbl.Parent            = curseIndicator
+
+-- ────────────────────────────────────────────────
+-- ORIGIN SELECTION SCREEN  (shown after archetype selection)
+-- ────────────────────────────────────────────────
+
+local SelectOriginEvt = RemoteEvents:WaitForChild("SelectOrigin", 15)
+
+local originScreen = Instance.new("Frame")
+originScreen.Name              = "OriginScreen"
+originScreen.Size              = UDim2.new(1, 0, 1, 0)
+originScreen.BackgroundColor3  = Color3.fromRGB(6, 10, 18)
+originScreen.BackgroundTransparency = 1
+originScreen.Visible           = false
+originScreen.ZIndex            = 16
+originScreen.Parent            = hudGui
+
+local originTitle = Instance.new("TextLabel")
+originTitle.Size              = UDim2.new(0.7, 0, 0, 50)
+originTitle.Position          = UDim2.new(0.15, 0, 0, 60)
+originTitle.BackgroundTransparency = 1
+originTitle.Text              = "CHOOSE YOUR ORIGIN"
+originTitle.TextColor3        = C.AmberLight
+originTitle.TextScaled        = true
+originTitle.Font              = Enum.Font.GothamBold
+originTitle.ZIndex            = 17
+originTitle.Parent            = originScreen
+Instance.new("UIStroke", originTitle).Color = C.PanelBorder
+
+local originSub = Instance.new("TextLabel")
+originSub.Size              = UDim2.new(0.7, 0, 0, 28)
+originSub.Position          = UDim2.new(0.15, 0, 0, 114)
+originSub.BackgroundTransparency = 1
+originSub.Text              = "Your origin grants a permanent passive trait for this entire run."
+originSub.TextColor3        = C.TextDim
+originSub.TextScaled        = true
+originSub.Font              = Enum.Font.Gotham
+originSub.ZIndex            = 17
+originSub.Parent            = originScreen
+
+local originCardScroll = Instance.new("ScrollingFrame")
+originCardScroll.Size              = UDim2.new(0.9, 0, 0, 340)
+originCardScroll.Position          = UDim2.new(0.05, 0, 0, 154)
+originCardScroll.BackgroundTransparency = 1
+originCardScroll.BorderSizePixel   = 0
+originCardScroll.ScrollBarThickness = 8
+originCardScroll.ScrollBarImageColor3 = C.Amber
+originCardScroll.CanvasSize        = UDim2.new(0, 0, 0, 0)
+originCardScroll.AutomaticCanvasSize = Enum.AutomaticSize.X
+originCardScroll.ScrollingDirection = Enum.ScrollingDirection.X
+originCardScroll.ZIndex            = 17
+originCardScroll.Parent            = originScreen
+
+local originCardLayout = Instance.new("UIListLayout", originCardScroll)
+originCardLayout.FillDirection     = Enum.FillDirection.Horizontal
+originCardLayout.Padding           = UDim.new(0, 16)
+originCardLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+
+local function buildOriginCard(origin)
+    local aura = origin.AuraColor
+    local auraColor = (aura and typeof(aura) == "Color3") and aura
+        or Color3.fromRGB(200, 150, 30)
+
+    local card = Instance.new("Frame")
+    card.Size              = UDim2.new(0, 200, 0, 300)
+    card.BackgroundColor3  = Color3.fromRGB(14, 11, 8)
+    card.BorderSizePixel   = 0
+    card.ZIndex            = 18
+    card.Parent            = originCardScroll
+    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 12)
+    local cStroke = Instance.new("UIStroke", card)
+    cStroke.Color     = auraColor
+    cStroke.Thickness = 2
+
+    local auraStrip = Instance.new("Frame")
+    auraStrip.Size             = UDim2.new(1, 0, 0, 7)
+    auraStrip.BackgroundColor3 = auraColor
+    auraStrip.BorderSizePixel  = 0
+    auraStrip.ZIndex           = 18
+    auraStrip.Parent           = card
+    Instance.new("UICorner", auraStrip).CornerRadius = UDim.new(0, 6)
+
+    local namePfx = Instance.new("TextLabel")
+    namePfx.Size              = UDim2.new(1, -12, 0, 18)
+    namePfx.Position          = UDim2.new(0, 6, 0, 12)
+    namePfx.BackgroundTransparency = 1
+    namePfx.Text              = origin.NamePrefix or ""
+    namePfx.TextColor3        = auraColor
+    namePfx.TextScaled        = true
+    namePfx.Font              = Enum.Font.Gotham
+    namePfx.ZIndex            = 19
+    namePfx.Parent            = card
+
+    local nameLbl = Instance.new("TextLabel")
+    nameLbl.Size              = UDim2.new(1, -12, 0, 28)
+    nameLbl.Position          = UDim2.new(0, 6, 0, 32)
+    nameLbl.BackgroundTransparency = 1
+    nameLbl.Text              = origin.Name
+    nameLbl.TextColor3        = C.TextMain
+    nameLbl.TextScaled        = true
+    nameLbl.Font              = Enum.Font.GothamBold
+    nameLbl.ZIndex            = 19
+    nameLbl.Parent            = card
+
+    local passiveName = Instance.new("TextLabel")
+    passiveName.Size              = UDim2.new(1, -12, 0, 18)
+    passiveName.Position          = UDim2.new(0, 6, 0, 64)
+    passiveName.BackgroundTransparency = 1
+    passiveName.Text              = "◆  " .. (origin.PassiveName or "")
+    passiveName.TextColor3        = C.AmberLight
+    passiveName.TextScaled        = true
+    passiveName.Font              = Enum.Font.GothamBold
+    passiveName.ZIndex            = 19
+    passiveName.Parent            = card
+
+    local passiveDesc = Instance.new("TextLabel")
+    passiveDesc.Size              = UDim2.new(1, -12, 0, 62)
+    passiveDesc.Position          = UDim2.new(0, 6, 0, 84)
+    passiveDesc.BackgroundTransparency = 1
+    passiveDesc.Text              = origin.PassiveDesc or ""
+    passiveDesc.TextColor3        = C.TextDim
+    passiveDesc.TextScaled        = true
+    passiveDesc.TextWrapped       = true
+    passiveDesc.Font              = Enum.Font.Gotham
+    passiveDesc.ZIndex            = 19
+    passiveDesc.Parent            = card
+
+    local quoteLabel = Instance.new("TextLabel")
+    quoteLabel.Size              = UDim2.new(1, -12, 0, 50)
+    quoteLabel.Position          = UDim2.new(0, 6, 0, 152)
+    quoteLabel.BackgroundTransparency = 1
+    quoteLabel.Text              = origin.FlavorQuote and ('"' .. origin.FlavorQuote .. '"') or ""
+    quoteLabel.TextColor3        = Color3.fromRGB(150, 140, 120)
+    quoteLabel.TextScaled        = true
+    quoteLabel.TextWrapped       = true
+    quoteLabel.Font              = Enum.Font.GothamItalic
+    quoteLabel.ZIndex            = 19
+    quoteLabel.Parent            = card
+
+    local pickBtn = Instance.new("TextButton")
+    pickBtn.Size              = UDim2.new(1, -16, 0, 38)
+    pickBtn.Position          = UDim2.new(0, 8, 1, -48)
+    pickBtn.BackgroundColor3  = auraColor
+    pickBtn.Text              = "CHOOSE"
+    pickBtn.TextColor3        = Color3.fromRGB(8, 6, 4)
+    pickBtn.TextScaled        = true
+    pickBtn.Font              = Enum.Font.GothamBold
+    pickBtn.BorderSizePixel   = 0
+    pickBtn.ZIndex            = 20
+    pickBtn.Parent            = card
+    Instance.new("UICorner", pickBtn).CornerRadius = UDim.new(0, 8)
+
+    pickBtn.MouseButton1Click:Connect(function()
+        if SelectOriginEvt then SelectOriginEvt:FireServer(origin.Id) end
+        TweenService:Create(originScreen, TweenInfo.new(0.4, Enum.EasingStyle.Quad),
+            { BackgroundTransparency = 1 }):Play()
+        task.delay(0.4, function() originScreen.Visible = false end)
+    end)
+    pickBtn.MouseEnter:Connect(function()
+        TweenService:Create(pickBtn, TweenInfo.new(0.1), { BackgroundColor3 = C.AmberLight }):Play()
+    end)
+    pickBtn.MouseLeave:Connect(function()
+        TweenService:Create(pickBtn, TweenInfo.new(0.1), { BackgroundColor3 = auraColor }):Play()
+    end)
+end
+
+UpdateHUD.OnClientEvent:Connect(function(data)
+    if data.ShowOriginScreen and data.Origins then
+        for _, child in ipairs(originCardScroll:GetChildren()) do
+            if child:IsA("GuiObject") and child.ClassName ~= "UIListLayout" then child:Destroy() end
+        end
+        for _, o in ipairs(data.Origins) do buildOriginCard(o) end
+        originScreen.BackgroundTransparency = 1
+        originScreen.Visible = true
+        TweenService:Create(originScreen, TweenInfo.new(0.5), { BackgroundTransparency = 0 }):Play()
+    end
+end)
+
+-- ────────────────────────────────────────────────
+-- SEALED CHAMBER CURSE PANEL
+-- ────────────────────────────────────────────────
+
+local PickCurseEvt = RemoteEvents:WaitForChild("PickCurse", 15)
+
+local curseFrame = Instance.new("Frame")
+curseFrame.Name              = "CursePanel"
+curseFrame.Size              = UDim2.new(0, 600, 0, 440)
+curseFrame.Position          = UDim2.new(0.5, -300, 0.5, -220)
+curseFrame.BackgroundColor3  = Color3.fromRGB(8, 4, 4)
+curseFrame.BackgroundTransparency = 0.06
+curseFrame.Visible           = false
+curseFrame.ZIndex            = 30
+curseFrame.Parent            = hudGui
+Instance.new("UICorner", curseFrame).CornerRadius = UDim.new(0, 16)
+local curseFrameStroke = Instance.new("UIStroke", curseFrame)
+curseFrameStroke.Color     = Color3.fromRGB(180, 20, 20)
+curseFrameStroke.Thickness = 2
+
+local cursePanelTitle = Instance.new("TextLabel")
+cursePanelTitle.Size              = UDim2.new(1, -60, 0, 46)
+cursePanelTitle.Position          = UDim2.new(0, 10, 0, 8)
+cursePanelTitle.BackgroundTransparency = 1
+cursePanelTitle.Text              = "⚠  SEALED CHAMBER"
+cursePanelTitle.TextColor3        = Color3.fromRGB(255, 80, 80)
+cursePanelTitle.TextScaled        = true
+cursePanelTitle.Font              = Enum.Font.GothamBold
+cursePanelTitle.ZIndex            = 31
+cursePanelTitle.Parent            = curseFrame
+
+local cursePanelClose = Instance.new("TextButton")
+cursePanelClose.Size              = UDim2.new(0, 34, 0, 34)
+cursePanelClose.Position          = UDim2.new(1, -42, 0, 10)
+cursePanelClose.BackgroundColor3  = Color3.fromRGB(120, 20, 20)
+cursePanelClose.Text              = "✕"
+cursePanelClose.TextColor3        = Color3.new(1, 1, 1)
+cursePanelClose.TextScaled        = true
+cursePanelClose.Font              = Enum.Font.GothamBold
+cursePanelClose.BorderSizePixel   = 0
+cursePanelClose.ZIndex            = 32
+cursePanelClose.Parent            = curseFrame
+Instance.new("UICorner", cursePanelClose).CornerRadius = UDim.new(0, 8)
+cursePanelClose.MouseButton1Click:Connect(function() curseFrame.Visible = false end)
+
+local cursePanelSub = Instance.new("TextLabel")
+cursePanelSub.Size              = UDim2.new(1, -16, 0, 36)
+cursePanelSub.Position          = UDim2.new(0, 8, 0, 56)
+cursePanelSub.BackgroundTransparency = 1
+cursePanelSub.Text              = "Accept a curse in exchange for power.  Only one curse can be active."
+cursePanelSub.TextColor3        = C.TextDim
+cursePanelSub.TextScaled        = true
+cursePanelSub.Font              = Enum.Font.Gotham
+cursePanelSub.TextWrapped       = true
+cursePanelSub.ZIndex            = 31
+cursePanelSub.Parent            = curseFrame
+
+local curseOptContainer = Instance.new("Frame")
+curseOptContainer.Size              = UDim2.new(1, -24, 1, -102)
+curseOptContainer.Position          = UDim2.new(0, 12, 0, 96)
+curseOptContainer.BackgroundTransparency = 1
+curseOptContainer.ZIndex            = 31
+curseOptContainer.Parent            = curseFrame
+local curseOptLayout = Instance.new("UIListLayout", curseOptContainer)
+curseOptLayout.Padding              = UDim.new(0, 10)
+curseOptLayout.HorizontalAlignment  = Enum.HorizontalAlignment.Center
+
+local CURSE_TIER_COLORS = {
+    [1] = Color3.fromRGB(180, 100, 100),
+    [2] = Color3.fromRGB(220, 60, 60),
+    [3] = Color3.fromRGB(255, 20, 20),
+}
+
+local function buildCurseOption(opt, roomId, alreadyChosen)
+    local tierColor = CURSE_TIER_COLORS[opt.Tier] or CURSE_TIER_COLORS[1]
+
+    local row = Instance.new("Frame")
+    row.Size              = UDim2.new(1, 0, 0, 96)
+    row.BackgroundColor3  = Color3.fromRGB(20, 8, 8)
+    row.BorderSizePixel   = 0
+    row.ZIndex            = 32
+    row.Parent            = curseOptContainer
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 10)
+    local rStroke = Instance.new("UIStroke", row)
+    rStroke.Color     = tierColor
+    rStroke.Thickness = 1
+
+    local iconLbl = Instance.new("TextLabel")
+    iconLbl.Size              = UDim2.new(0, 46, 0.6, 0)
+    iconLbl.Position          = UDim2.new(0, 6, 0.2, 0)
+    iconLbl.BackgroundTransparency = 1
+    iconLbl.Text              = opt.Icon or "💀"
+    iconLbl.TextScaled        = true
+    iconLbl.ZIndex            = 33
+    iconLbl.Parent            = row
+
+    local curseName = Instance.new("TextLabel")
+    curseName.Size              = UDim2.new(0.44, 0, 0.36, 0)
+    curseName.Position          = UDim2.new(0, 56, 0, 4)
+    curseName.BackgroundTransparency = 1
+    curseName.Text              = opt.Name or ""
+    curseName.TextColor3        = tierColor
+    curseName.TextScaled        = true
+    curseName.Font              = Enum.Font.GothamBold
+    curseName.TextXAlignment    = Enum.TextXAlignment.Left
+    curseName.ZIndex            = 33
+    curseName.Parent            = row
+
+    local curseDesc = Instance.new("TextLabel")
+    curseDesc.Size              = UDim2.new(0.58, 0, 0.42, 0)
+    curseDesc.Position          = UDim2.new(0, 56, 0.40, 0)
+    curseDesc.BackgroundTransparency = 1
+    curseDesc.Text              = opt.Description or ""
+    curseDesc.TextColor3        = C.TextDim
+    curseDesc.TextScaled        = true
+    curseDesc.TextWrapped       = true
+    curseDesc.Font              = Enum.Font.Gotham
+    curseDesc.TextXAlignment    = Enum.TextXAlignment.Left
+    curseDesc.ZIndex            = 33
+    curseDesc.Parent            = row
+
+    local bonusLbl = Instance.new("TextLabel")
+    bonusLbl.Size              = UDim2.new(0.3, 0, 0.44, 0)
+    bonusLbl.Position          = UDim2.new(0.57, 0, 0.06, 0)
+    bonusLbl.BackgroundTransparency = 1
+    bonusLbl.Text              = opt.Bonus or ""
+    bonusLbl.TextColor3        = C.Green
+    bonusLbl.TextScaled        = true
+    bonusLbl.TextWrapped       = true
+    bonusLbl.Font              = Enum.Font.Gotham
+    bonusLbl.TextXAlignment    = Enum.TextXAlignment.Left
+    bonusLbl.ZIndex            = 33
+    bonusLbl.Parent            = row
+
+    local acceptBtn = Instance.new("TextButton")
+    acceptBtn.Size              = UDim2.new(0, 80, 0.45, 0)
+    acceptBtn.Position          = UDim2.new(1, -90, 0.52, 0)
+    acceptBtn.BackgroundColor3  = alreadyChosen and Color3.fromRGB(60, 20, 20) or tierColor
+    acceptBtn.Text              = alreadyChosen and "SEALED" or "ACCEPT"
+    acceptBtn.TextColor3        = alreadyChosen and C.TextDim or Color3.new(1, 1, 1)
+    acceptBtn.TextScaled        = true
+    acceptBtn.Font              = Enum.Font.GothamBold
+    acceptBtn.BorderSizePixel   = 0
+    acceptBtn.Active            = not alreadyChosen
+    acceptBtn.ZIndex            = 33
+    acceptBtn.Parent            = row
+    Instance.new("UICorner", acceptBtn).CornerRadius = UDim.new(0, 8)
+
+    if not alreadyChosen then
+        acceptBtn.MouseButton1Click:Connect(function()
+            if PickCurseEvt then PickCurseEvt:FireServer(opt.Id, roomId) end
+            curseFrame.Visible = false
+        end)
+        acceptBtn.MouseEnter:Connect(function()
+            TweenService:Create(acceptBtn, TweenInfo.new(0.1), { BackgroundColor3 = Color3.fromRGB(255, 80, 80) }):Play()
+        end)
+        acceptBtn.MouseLeave:Connect(function()
+            TweenService:Create(acceptBtn, TweenInfo.new(0.1), { BackgroundColor3 = tierColor }):Play()
+        end)
+    end
+end
+
+UpdateHUD.OnClientEvent:Connect(function(data)
+    -- Open Sealed Chamber curse selection
+    if data.SealedChamberOpen and data.Options then
+        for _, child in ipairs(curseOptContainer:GetChildren()) do
+            if child:IsA("GuiObject") and child.ClassName ~= "UIListLayout" then child:Destroy() end
+        end
+        cursePanelSub.Text = data.DoorText or "Accept a curse in exchange for power."
+        for _, opt in ipairs(data.Options) do
+            buildCurseOption(opt, data.RoomId, data.AlreadyChosen)
+        end
+        curseFrame.Position = UDim2.new(0.5, -300, 1.1, 0)
+        curseFrame.Visible  = true
+        TweenService:Create(curseFrame,
+            TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+            { Position = UDim2.new(0.5, -300, 0.5, -220) }):Play()
+    end
+
+    -- Show active curse in bottom-left indicator
+    if data.CurseAccepted then
+        curseLbl.Text = (data.CurseIcon or "💀") .. "  " .. (data.CurseName or "Cursed")
+        curseIndicator.Visible = true
+    end
+end)
+
+-- ────────────────────────────────────────────────
+-- FLOOR LORE, MECHANIC HUD, BOSS DIALOGUE, FLAVOR LINES
+-- ────────────────────────────────────────────────
+
+UpdateHUD.OnClientEvent:Connect(function(data)
+    -- Mechanic HUD indicator: show active dungeon mechanic name
+    if data.FloorStart and data.MechanicName then
+        local hudLabel = data.MechanicHUDLabel or data.MechanicName
+        local hColor   = data.MechanicHUDColor   -- Color3 value
+        mechanicLabel.Text = "⚡  " .. hudLabel
+        if hColor and typeof(hColor) == "Color3" then
+            mechanicLabel.TextColor3 = hColor
+            mechStroke.Color         = hColor
+        end
+        mechanicPanel.Visible = true
+    end
+
+    -- Floor start overlay: show ShardName + EntryFlavor lore text
+    if data.FloorStart and data.EntryFlavor then
+        local shardText = data.ShardName or data.ThemeName
+        overlay.BackgroundColor3 = Color3.fromRGB(0, 5, 14)
+        overlayLabel.TextColor3  = C.AmberLight
+        overlay.BackgroundTransparency = 0
+        overlayLabel.TextTransparency  = 0
+        overlayLabel.Text = "Floor " .. data.Floor .. "  ·  " .. shardText
+            .. "\n" .. data.EntryFlavor
+        TweenService:Create(overlay,
+            TweenInfo.new(3.2, Enum.EasingStyle.Quad),
+            { BackgroundTransparency = 1 }):Play()
+        TweenService:Create(overlayLabel,
+            TweenInfo.new(3.2, Enum.EasingStyle.Quad),
+            { TextTransparency = 1 }):Play()
+        task.delay(3.3, function() overlayLabel.Text = ""; overlayLabel.TextTransparency = 0 end)
+    end
+
+    -- Boss defeated: show lore dialogue banner
+    if data.BossDefeated then
+        local displayText = "✦  " .. (data.BossName or "Boss") .. " Defeated"
+        if data.BossDialogue then
+            displayText = displayText .. '\n"' .. data.BossDialogue .. '"'
+        end
+        overlay.BackgroundColor3 = Color3.fromRGB(22, 12, 0)
+        overlayLabel.TextColor3  = C.AmberLight
+        overlay.BackgroundTransparency = 0.1
+        overlayLabel.Text = displayText
+        TweenService:Create(overlay,
+            TweenInfo.new(3.5, Enum.EasingStyle.Quad),
+            { BackgroundTransparency = 1 }):Play()
+        if data.ClearFlavor then
+            task.delay(3.6, function()
+                overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+                showToast(data.ClearFlavor, Color3.fromRGB(30, 20, 0), 4.5)
+            end)
+        else
+            task.delay(3.6, function() overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0) end)
+        end
+    end
+
+    -- Room entry flavor line: brief lore text toast
+    if data.FlavorLine then
+        showToast(data.FlavorLine, Color3.fromRGB(10, 8, 20), data.Duration or 3.5)
+    end
+end)
+
+-- ────────────────────────────────────────────────
+-- ROOM CLEARED → update progress bar toward boss
+-- ────────────────────────────────────────────────
+
+RoomClearedEvt.OnClientEvent:Connect(function(data)
+    local cleared = data.Cleared or 0
+    local total   = data.Total   or 1
+    local pct     = math.clamp(cleared / total, 0, 1)
+
+    roomProgressBG.Visible = true
+    TweenService:Create(roomProgressFill,
+        TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        { Size = UDim2.new(pct, 0, 1, 0) }
+    ):Play()
+
+    if cleared >= total then
+        TweenService:Create(roomProgressFill,
+            TweenInfo.new(0.25),
+            { BackgroundColor3 = Color3.fromRGB(200, 40, 40) }
+        ):Play()
+        roomProgressLabel.Text = "Boss Chamber Open!"
+    else
+        roomProgressLabel.Text = "Rooms  " .. cleared .. " / " .. total
+    end
+end)
+
+-- ────────────────────────────────────────────────
+-- GAMBLING UI
+-- ────────────────────────────────────────────────
+
+local PickGambleEvt   = RemoteEvents:WaitForChild("PickGamble")
+local GambleResultEvt = RemoteEvents:WaitForChild("GambleResult")
+
+-- Outer panel (slides in from bottom, same pattern as curse panel)
+local gambleFrame = Instance.new("Frame")
+gambleFrame.Name              = "GambleFrame"
+gambleFrame.Size              = UDim2.new(0, 620, 0, 380)
+gambleFrame.Position          = UDim2.new(0.5, -310, 1.2, 0)
+gambleFrame.BackgroundColor3  = Color3.fromRGB(18, 10, 5)
+gambleFrame.BorderSizePixel   = 0
+gambleFrame.Visible           = false
+gambleFrame.ZIndex            = 40
+gambleFrame.Parent            = hudGui
+Instance.new("UICorner", gambleFrame).CornerRadius = UDim.new(0, 14)
+local gambleStroke = Instance.new("UIStroke", gambleFrame)
+gambleStroke.Color     = Color3.fromRGB(180, 50, 0)
+gambleStroke.Thickness = 2
+
+local gambleTitleBg = Instance.new("Frame")
+gambleTitleBg.Size             = UDim2.new(1, 0, 0, 52)
+gambleTitleBg.BackgroundColor3 = Color3.fromRGB(120, 30, 0)
+gambleTitleBg.BorderSizePixel  = 0
+gambleTitleBg.ZIndex           = 41
+gambleTitleBg.Parent           = gambleFrame
+Instance.new("UICorner", gambleTitleBg).CornerRadius = UDim.new(0, 14)
+
+local gambleTitle = Instance.new("TextLabel")
+gambleTitle.Size                = UDim2.new(1, -20, 1, 0)
+gambleTitle.Position            = UDim2.new(0, 10, 0, 0)
+gambleTitle.BackgroundTransparency = 1
+gambleTitle.Text                = "🎰  THE VOID OFFERS A DEAL"
+gambleTitle.TextColor3          = Color3.fromRGB(255, 200, 80)
+gambleTitle.TextScaled          = true
+gambleTitle.Font                = Enum.Font.GothamBold
+gambleTitle.ZIndex              = 42
+gambleTitle.Parent              = gambleTitleBg
+
+local gambleSubtitle = Instance.new("TextLabel")
+gambleSubtitle.Size                = UDim2.new(1, -20, 0, 26)
+gambleSubtitle.Position            = UDim2.new(0, 10, 0, 52)
+gambleSubtitle.BackgroundTransparency = 1
+gambleSubtitle.Text                = "Every deal costs something. Some rewards are worth it."
+gambleSubtitle.TextColor3          = Color3.fromRGB(180, 150, 100)
+gambleSubtitle.TextScaled          = true
+gambleSubtitle.Font                = Enum.Font.Gotham
+gambleSubtitle.ZIndex              = 41
+gambleSubtitle.Parent              = gambleFrame
+
+local gambleOptContainer = Instance.new("Frame")
+gambleOptContainer.Size             = UDim2.new(1, -20, 1, -100)
+gambleOptContainer.Position         = UDim2.new(0, 10, 0, 88)
+gambleOptContainer.BackgroundTransparency = 1
+gambleOptContainer.ZIndex           = 41
+gambleOptContainer.Parent           = gambleFrame
+local gambleLayout = Instance.new("UIListLayout", gambleOptContainer)
+gambleLayout.Padding          = UDim.new(0, 6)
+gambleLayout.SortOrder        = Enum.SortOrder.LayoutOrder
+
+local gambleCloseBtn = Instance.new("TextButton")
+gambleCloseBtn.Size             = UDim2.new(0, 80, 0, 28)
+gambleCloseBtn.Position         = UDim2.new(1, -90, 0, 12)
+gambleCloseBtn.BackgroundColor3 = Color3.fromRGB(60, 20, 10)
+gambleCloseBtn.Text             = "LEAVE"
+gambleCloseBtn.TextColor3       = Color3.fromRGB(200, 140, 80)
+gambleCloseBtn.TextScaled       = true
+gambleCloseBtn.Font             = Enum.Font.GothamBold
+gambleCloseBtn.BorderSizePixel  = 0
+gambleCloseBtn.ZIndex           = 42
+gambleCloseBtn.Parent           = gambleFrame
+Instance.new("UICorner", gambleCloseBtn).CornerRadius = UDim.new(0, 8)
+gambleCloseBtn.MouseButton1Click:Connect(function()
+    gambleFrame.Visible = false
+end)
+
+-- Hazard colour by level
+local function hazardColor(level)
+    if level == 1 then return Color3.fromRGB(80, 160, 80)
+    elseif level == 2 then return Color3.fromRGB(200, 140, 30)
+    else return Color3.fromRGB(200, 40, 40)
+    end
+end
+
+local function buildGambleOption(opt)
+    local row = Instance.new("Frame")
+    row.Size             = UDim2.new(1, 0, 0, 60)
+    row.BackgroundColor3 = Color3.fromRGB(28, 16, 8)
+    row.BorderSizePixel  = 0
+    row.ZIndex           = 42
+    row.Parent           = gambleOptContainer
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
+    local rowStroke = Instance.new("UIStroke", row)
+    rowStroke.Color     = hazardColor(opt.HazardLevel or 1)
+    rowStroke.Thickness = 1.5
+
+    local iconLbl = Instance.new("TextLabel")
+    iconLbl.Size               = UDim2.new(0, 46, 1, 0)
+    iconLbl.BackgroundTransparency = 1
+    iconLbl.Text               = opt.Icon or "?"
+    iconLbl.TextScaled         = true
+    iconLbl.ZIndex             = 43
+    iconLbl.Parent             = row
+
+    local nameLbl = Instance.new("TextLabel")
+    nameLbl.Size               = UDim2.new(0.28, 0, 0.50, 0)
+    nameLbl.Position           = UDim2.new(0, 50, 0, 2)
+    nameLbl.BackgroundTransparency = 1
+    nameLbl.Text               = opt.Name or ""
+    nameLbl.TextColor3         = hazardColor(opt.HazardLevel or 1)
+    nameLbl.TextScaled         = true
+    nameLbl.Font               = Enum.Font.GothamBold
+    nameLbl.TextXAlignment     = Enum.TextXAlignment.Left
+    nameLbl.ZIndex             = 43
+    nameLbl.Parent             = row
+
+    local costLbl = Instance.new("TextLabel")
+    costLbl.Size               = UDim2.new(0.44, 0, 0.44, 0)
+    costLbl.Position           = UDim2.new(0, 50, 0.50, 0)
+    costLbl.BackgroundTransparency = 1
+    costLbl.Text               = "COST: " .. (opt.CostText or "")
+    costLbl.TextColor3         = C.Red
+    costLbl.TextScaled         = true
+    costLbl.Font               = Enum.Font.Gotham
+    costLbl.TextXAlignment     = Enum.TextXAlignment.Left
+    costLbl.ZIndex             = 43
+    costLbl.Parent             = row
+
+    local rewardLbl = Instance.new("TextLabel")
+    rewardLbl.Size             = UDim2.new(0.28, 0, 0.85, 0)
+    rewardLbl.Position         = UDim2.new(0.44, 4, 0.07, 0)
+    rewardLbl.BackgroundTransparency = 1
+    rewardLbl.Text             = opt.RewardText or ""
+    rewardLbl.TextColor3       = C.Green
+    rewardLbl.TextScaled       = true
+    rewardLbl.TextWrapped      = true
+    rewardLbl.Font             = Enum.Font.Gotham
+    rewardLbl.TextXAlignment   = Enum.TextXAlignment.Left
+    rewardLbl.ZIndex           = 43
+    rewardLbl.Parent           = row
+
+    local dealBtn = Instance.new("TextButton")
+    dealBtn.Size               = UDim2.new(0, 74, 0.55, 0)
+    dealBtn.Position           = UDim2.new(1, -84, 0.22, 0)
+    dealBtn.BackgroundColor3   = hazardColor(opt.HazardLevel or 1)
+    dealBtn.Text               = "DEAL"
+    dealBtn.TextColor3         = Color3.new(1, 1, 1)
+    dealBtn.TextScaled         = true
+    dealBtn.Font               = Enum.Font.GothamBold
+    dealBtn.BorderSizePixel    = 0
+    dealBtn.ZIndex             = 43
+    dealBtn.Parent             = row
+    Instance.new("UICorner", dealBtn).CornerRadius = UDim.new(0, 8)
+    dealBtn.MouseButton1Click:Connect(function()
+        PickGambleEvt:FireServer(opt.Id)
+        gambleFrame.Visible = false
+    end)
+    dealBtn.MouseEnter:Connect(function()
+        TweenService:Create(dealBtn, TweenInfo.new(0.1), { BackgroundColor3 = Color3.fromRGB(255, 255, 255) }):Play()
+    end)
+    dealBtn.MouseLeave:Connect(function()
+        TweenService:Create(dealBtn, TweenInfo.new(0.1), { BackgroundColor3 = hazardColor(opt.HazardLevel or 1) }):Play()
+    end)
+end
+
+-- Show gamble panel handler
+UpdateHUD.OnClientEvent:Connect(function(data)
+    if not data.GambleOpen or not data.Options then return end
+    for _, child in ipairs(gambleOptContainer:GetChildren()) do
+        if child:IsA("GuiObject") then child:Destroy() end
+    end
+    for _, opt in ipairs(data.Options) do
+        buildGambleOption(opt)
+    end
+    gambleFrame.Position = UDim2.new(0.5, -310, 1.2, 0)
+    gambleFrame.Visible  = true
+    TweenService:Create(gambleFrame,
+        TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+        { Position = UDim2.new(0.5, -310, 0.5, -190) }):Play()
+end)
+
+-- Gamble result notification
+GambleResultEvt.OnClientEvent:Connect(function(data)
+    if not data then return end
+    local bg = data.Success and Color3.fromRGB(20, 60, 20) or Color3.fromRGB(60, 10, 10)
+    local tc = data.Success and C.Green or C.Red
+    local panel = Instance.new("Frame")
+    panel.Size             = UDim2.new(0, 480, 0, 110)
+    panel.Position         = UDim2.new(0.5, -240, 0.3, 0)
+    panel.BackgroundColor3 = bg
+    panel.BorderSizePixel  = 0
+    panel.ZIndex           = 50
+    panel.Parent           = hudGui
+    Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 12)
+    local panelStroke = Instance.new("UIStroke", panel)
+    panelStroke.Color = tc; panelStroke.Thickness = 2
+
+    local headLbl = Instance.new("TextLabel", panel)
+    headLbl.Size               = UDim2.new(1, -16, 0, 44)
+    headLbl.Position           = UDim2.new(0, 8, 0, 4)
+    headLbl.BackgroundTransparency = 1
+    headLbl.Text               = data.Headline or (data.Success and "SUCCESS" or "FAILED")
+    headLbl.TextColor3         = tc
+    headLbl.TextScaled         = true
+    headLbl.Font               = Enum.Font.GothamBold
+    headLbl.ZIndex             = 51
+
+    local detLbl = Instance.new("TextLabel", panel)
+    detLbl.Size                = UDim2.new(1, -16, 0, 54)
+    detLbl.Position            = UDim2.new(0, 8, 0, 50)
+    detLbl.BackgroundTransparency = 1
+    detLbl.Text                = data.Detail or ""
+    detLbl.TextColor3          = C.TextMain
+    detLbl.TextScaled          = true
+    detLbl.TextWrapped         = true
+    detLbl.Font                = Enum.Font.Gotham
+    detLbl.ZIndex              = 51
+
+    panel.BackgroundTransparency = 1
+    TweenService:Create(panel, TweenInfo.new(0.2), { BackgroundTransparency = 0 }):Play()
+    task.delay(3.5, function()
+        TweenService:Create(panel, TweenInfo.new(0.4), { BackgroundTransparency = 1 }):Play()
+        task.wait(0.45)
+        if panel.Parent then panel:Destroy() end
+    end)
+end)
+
+-- ────────────────────────────────────────────────
+-- ABILITY COOLDOWN ANIMATION
+-- ────────────────────────────────────────────────
+
+local AbilityCastEvt = RemoteEvents:WaitForChild("AbilityCast", 15)
+local AbilitySystemMod = require(ReplicatedStorage.Modules.AbilitySystem)
+
+-- Track which slot each ability is in
+local slotForAbility = {}  -- [abilityName] = slotIndex
+
+UpdateHUD.OnClientEvent:Connect(function(data)
+    if data.ActiveSlots then
+        slotForAbility = {}
+        for i, name in ipairs(data.ActiveSlots) do
+            if name then slotForAbility[name] = i end
+        end
+    end
+end)
+
+local function startCooldownOverlay(slotIndex, cooldownSecs)
+    local slot = abilitySlotFrames[slotIndex]
+    if not slot then return end
+    local overlay = slot:FindFirstChild("Cooldown")
+    if not overlay then return end
+
+    -- Show a cooldown timer label
+    local timerLbl = slot:FindFirstChild("CooldownTimer")
+    if not timerLbl then
+        timerLbl = Instance.new("TextLabel")
+        timerLbl.Name = "CooldownTimer"
+        timerLbl.Size = UDim2.new(1, 0, 1, 0)
+        timerLbl.BackgroundTransparency = 1
+        timerLbl.TextColor3 = Color3.new(1, 1, 1)
+        timerLbl.TextScaled = true
+        timerLbl.Font = Enum.Font.GothamBold
+        timerLbl.ZIndex = 9
+        timerLbl.Parent = slot
+    end
+
+    overlay.Size = UDim2.new(1, 0, 1, 0)
+    overlay.BackgroundTransparency = 0.4
+    timerLbl.Text = tostring(math.ceil(cooldownSecs))
+    timerLbl.TextTransparency = 0
+
+    TweenService:Create(overlay, TweenInfo.new(cooldownSecs, Enum.EasingStyle.Linear), {
+        Size = UDim2.new(1, 0, 0, 0),
+    }):Play()
+
+    local elapsed = 0
+    local conn
+    conn = RunService.Heartbeat:Connect(function(dt)
+        elapsed = elapsed + dt
+        local remaining = cooldownSecs - elapsed
+        if remaining <= 0 then
+            overlay.Size = UDim2.new(1, 0, 0, 0)
+            timerLbl.Text = ""
+            conn:Disconnect()
+        else
+            timerLbl.Text = tostring(math.ceil(remaining))
+        end
+    end)
+end
+
+if AbilityCastEvt then
+    AbilityCastEvt.OnClientEvent:Connect(function(data)
+        if not data or data.CasterUserId ~= player.UserId then return end
+        local ab = AbilitySystemMod.GetAbility(data.AbilityName)
+        if not ab or ab.Cooldown <= 0 then return end
+        local slot = slotForAbility[data.AbilityName]
+        if slot then
+            startCooldownOverlay(slot, ab.Cooldown)
+        end
+    end)
+end
+
+print("[HUD] Loaded — Dungeon Piece style.")

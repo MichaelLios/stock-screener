@@ -9,6 +9,7 @@ local RunService        = game:GetService("RunService")
 local EnemyData       = require(ReplicatedStorage.Modules.EnemyData)
 local AbilitySystem   = require(ReplicatedStorage.Modules.AbilitySystem)
 local EnemyModifiers  = require(ReplicatedStorage.Modules.EnemyModifiers)
+local EnemyAvatars    = require(script.Parent.EnemyAvatars)
 
 -- CombatSystem is loaded lazily to avoid circular require on startup
 local CombatSystem
@@ -155,6 +156,18 @@ end
 -- Lazily resolved so this file doesn't depend on RemoteEvents being fully set up at require time
 local BossPhaseEvt
 
+-- Lazily loaded so EnemyAI doesn't create a circular require at startup
+local LoreData_cache = nil
+local function getLoreData()
+    if not LoreData_cache then
+        local ok, result = pcall(function()
+            return require(ReplicatedStorage.Modules.LoreData)
+        end)
+        if ok then LoreData_cache = result end
+    end
+    return LoreData_cache
+end
+
 local function checkPhase(enemyModel, enemyState, data, currentHP)
     if not data.PhaseThresholds then return end
     local maxHP = data.HP
@@ -163,11 +176,47 @@ local function checkPhase(enemyModel, enemyState, data, currentHP)
             enemyState.Phase = i
             print(("[EnemyAI] Boss '%s' entered phase %d"):format(data.DisplayName, i))
 
-            -- Stat escalation per phase
-            data.Atk = math.floor(data.Atk * 1.35)
-            data.Spd = data.Spd + 5
-            if i == 2 then
-                data.AttackRange = data.AttackRange * 1.2
+            -- Apply per-phase stat escalation from EnemyData (or fall back to legacy flat values)
+            -- Data uses 1-based "phase number" indexing ([2]=first transition, [3]=second transition)
+            local phaseStatMults = data.PhaseStatMults and data.PhaseStatMults[i + 1]
+            if phaseStatMults then
+                if phaseStatMults.AtkMult then
+                    data.Atk = math.floor(data.Atk * phaseStatMults.AtkMult)
+                end
+                if phaseStatMults.SpdAdd then
+                    data.Spd = data.Spd + phaseStatMults.SpdAdd
+                end
+                if phaseStatMults.AOERadiusMult then
+                    data.AttackRange = math.floor(data.AttackRange * phaseStatMults.AOERadiusMult)
+                end
+            else
+                -- Legacy fallback
+                data.Atk = math.floor(data.Atk * 1.35)
+                data.Spd = data.Spd + 5
+                if i == 2 then data.AttackRange = data.AttackRange * 1.2 end
+            end
+
+            -- Unlock phase-specific abilities
+            if data.PhaseAbilities and data.PhaseAbilities[i + 1] then
+                for _, abilityName in ipairs(data.PhaseAbilities[i + 1]) do
+                    local alreadyHas = false
+                    for _, existing in ipairs(data.Abilities) do
+                        if existing == abilityName then alreadyHas = true; break end
+                    end
+                    if not alreadyHas then
+                        table.insert(data.Abilities, abilityName)
+                    end
+                end
+            end
+
+            -- Gather boss dialogue from LoreData
+            local lore       = getLoreData()
+            local loreKey    = data.LoreKey
+            local dialogLine = nil
+            local phaseDesc  = data.PhaseDescriptions and data.PhaseDescriptions[i + 1]
+            if lore and loreKey then
+                local phaseKey = (i == 1) and "Phase2Taunt" or "Phase3Taunt"
+                dialogLine = lore.GetDialogueLine(loreKey, phaseKey)
             end
 
             -- Fire BossPhase event to all clients
@@ -177,12 +226,15 @@ local function checkPhase(enemyModel, enemyState, data, currentHP)
             end
             if BossPhaseEvt then
                 BossPhaseEvt:FireAllClients({
-                    BossName    = data.DisplayName,
-                    Phase       = i,
-                    TotalPhases = #data.PhaseThresholds + 1,
-                    EnemyId     = enemyModel:GetAttribute("EnemyId"),
-                    CurrentHP   = currentHP,
-                    MaxHP       = maxHP,
+                    BossName        = data.DisplayName,
+                    Phase           = i,
+                    TotalPhases     = #data.PhaseThresholds + 1,
+                    EnemyId         = enemyModel:GetAttribute("EnemyId"),
+                    CurrentHP       = currentHP,
+                    MaxHP           = maxHP,
+                    -- New: lore-driven phase context
+                    BossDialogue    = dialogLine,
+                    PhaseDescription = phaseDesc,
                 })
             end
         end
@@ -200,13 +252,15 @@ local function runAI(enemyModel, data)
     if not root then return end
 
     local state = {
-        Phase          = 0,
-        AttackCooldown = 0,
+        Phase           = 0,
+        AttackCooldown  = 0,
         AbilityCooldown = 0,
-        Patrolling     = true,
-        PatrolTarget   = root.Position + Vector3.new(math.random(-10, 10), 0, math.random(-10, 10)),
-        SummonCooldown = 0,
-        SummonCount    = 0,
+        Patrolling      = true,
+        PatrolTarget    = root.Position + Vector3.new(math.random(-10, 10), 0, math.random(-10, 10)),
+        SummonCooldown  = 0,
+        SummonCount     = 0,
+        FireTrailTimer  = 0,  -- for DemonLord phase 3 fire trails
+        TeleportTimer   = 0,  -- for ShadowLord phase 3 random teleport
     }
 
     local isBoss    = table.find(data.Behaviors, "Boss") ~= nil
@@ -243,6 +297,66 @@ local function runAI(enemyModel, data)
         -- Berserker modifier skips the threshold — always enraged.
         if (isBerserk and currentHP / data.HP <= 0.3) or isBerserkerMod then
             data.Spd = data.Spd + 0.01
+        end
+
+        -- ── Boss phase special mechanics ──────────────────────────────────────
+        if isBoss and state.Phase > 0 then
+            local phaseMults = data.PhaseStatMults and data.PhaseStatMults[state.Phase + 1]
+            if phaseMults then
+                -- Fire trails (DemonLord phase 3): drop ground fire at boss position
+                if phaseMults.LeaveFireTrails then
+                    state.FireTrailTimer = state.FireTrailTimer + AI_TICK
+                    if state.FireTrailTimer >= 0.55 then
+                        state.FireTrailTimer = 0
+                        local fPos = root.Position
+                        task.spawn(function()
+                            local hazard = Instance.new("Part")
+                            hazard.Shape       = Enum.PartType.Cylinder
+                            hazard.Size        = Vector3.new(0.3, 9, 9)
+                            hazard.CFrame      = CFrame.new(fPos.X, fPos.Y - 2.5, fPos.Z)
+                                * CFrame.Angles(0, 0, math.pi / 2)
+                            hazard.Anchored    = true
+                            hazard.CanCollide  = false
+                            hazard.Color       = Color3.fromRGB(255, 80, 20)
+                            hazard.Material    = Enum.Material.Neon
+                            hazard.Transparency = 0.45
+                            hazard.CastShadow  = false
+                            hazard.Parent      = workspace
+                            game:GetService("Debris"):AddItem(hazard, 5)
+                            for _ = 1, 10 do
+                                task.wait(0.5)
+                                if not hazard.Parent then break end
+                                for _, p in ipairs(Players:GetPlayers()) do
+                                    local char = p.Character
+                                    local pRoot = char and char:FindFirstChild("HumanoidRootPart")
+                                    if pRoot then
+                                        local dx = pRoot.Position.X - fPos.X
+                                        local dz = pRoot.Position.Z - fPos.Z
+                                        if math.sqrt(dx*dx + dz*dz) <= 5 then
+                                            if not CombatSystem then
+                                                CombatSystem = require(game.ServerScriptService.CombatSystem)
+                                            end
+                                            CombatSystem.DamagePlayer(p, 8, "Fire")
+                                        end
+                                    end
+                                end
+                            end
+                        end)
+                    end
+                end
+
+                -- Random teleport (ShadowLord phase 3): teleport boss to surprise position
+                if phaseMults.RandomTeleport then
+                    state.TeleportTimer = state.TeleportTimer + AI_TICK
+                    local interval = phaseMults.TeleportInterval or 3
+                    if state.TeleportTimer >= interval then
+                        state.TeleportTimer = 0
+                        local newX = root.Position.X + math.random(-30, 30)
+                        local newZ = root.Position.Z + math.random(-30, 30)
+                        root.CFrame = CFrame.new(newX, root.Position.Y, newZ)
+                    end
+                end
+            end
         end
 
         -- Find nearest player
@@ -378,28 +492,22 @@ end
 function EnemyAI.SpawnEnemy(enemyName, position, floor, roomFolder, roomType)
     local data = EnemyData.GetScaledEnemy(enemyName, floor)
 
+    -- Scale HP for multiplayer: +40% per additional player beyond the first
+    local playerCount = #Players:GetPlayers()
+    if playerCount > 1 then
+        local hpMult = 1 + (playerCount - 1) * 0.40
+        data.HP = math.floor(data.HP * hpMult)
+    end
+
+
     local model = Instance.new("Model")
     model.Name = data.DisplayName
 
-    local rootPart = Instance.new("Part")
-    rootPart.Name = "HumanoidRootPart"
-    rootPart.Size = data.Size
-    rootPart.Color = data.Color
-    rootPart.Material = Enum.Material.SmoothPlastic
-    rootPart.CFrame = CFrame.new(position)
-    rootPart.Anchored = true
-    rootPart.Parent = model
-    model.PrimaryPart = rootPart
+    EnemyAvatars.Build(enemyName, model, position, data.Size)
 
-    -- Head
-    local head = Instance.new("Part")
-    head.Name = "Head"
-    head.Size = Vector3.new(data.Size.X * 0.6, data.Size.X * 0.6, data.Size.X * 0.6)
-    head.Color = data.Color
-    head.Material = Enum.Material.SmoothPlastic
-    head.CFrame = CFrame.new(position + Vector3.new(0, data.Size.Y * 0.5 + data.Size.X * 0.3, 0))
-    head.Anchored = true
-    head.Parent = model
+    local rootPart = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
+    model.PrimaryPart = rootPart
+    local head = model:FindFirstChild("Head") or rootPart
 
     -- Nametag
     local bg = Instance.new("BillboardGui")
@@ -445,6 +553,81 @@ function EnemyAI.SpawnEnemy(enemyName, position, floor, roomFolder, roomType)
         model:SetAttribute("IsBoss",      true)
         model:SetAttribute("BossName",    data.DisplayName)
         model:SetAttribute("TotalPhases", #data.PhaseThresholds + 1)
+        model:SetAttribute("LoreKey",     data.LoreKey or "")
+
+        -- ── Boss portrait billboard ──────────────────────────────────────
+        -- A large in-world portrait panel appears behind the boss.
+        -- If PortraitImage is set, it renders the boss artwork.
+        -- In Studio Play Solo the URL loads directly; for production upload
+        -- the image to Roblox and replace PortraitImage with "rbxassetid://XXX".
+        if data.PortraitImage and data.PortraitImage ~= "" then
+            local portraitPart = Instance.new("Part")
+            portraitPart.Name        = "PortraitFrame"
+            portraitPart.Size        = Vector3.new(28, 38, 1)
+            portraitPart.CFrame      = CFrame.new(position + Vector3.new(0, 22, -16))
+            portraitPart.Anchored    = true
+            portraitPart.CanCollide  = false
+            portraitPart.Transparency = 0.05
+            portraitPart.Color       = Color3.fromRGB(8, 0, 12)
+            portraitPart.Material    = Enum.Material.SmoothPlastic
+            portraitPart.Parent      = model
+
+            -- Border glow
+            local border = Instance.new("SelectionBox")
+            border.Adornee      = portraitPart
+            border.Color3       = Color3.fromRGB(180, 0, 40)
+            border.LineThickness = 0.08
+            border.Parent        = portraitPart
+            local glow = Instance.new("PointLight")
+            glow.Color      = Color3.fromRGB(200, 20, 40)
+            glow.Brightness = 3
+            glow.Range      = 40
+            glow.Parent     = portraitPart
+
+            local sg = Instance.new("SurfaceGui")
+            sg.Face          = Enum.NormalId.Front
+            sg.SizingMode    = Enum.SurfaceGuiSizingMode.PixelsPerStud
+            sg.PixelsPerStud = 40
+            sg.Parent        = portraitPart
+
+            local img = Instance.new("ImageLabel")
+            img.Size                  = UDim2.new(1, 0, 0.88, 0)
+            img.Position              = UDim2.new(0, 0, 0, 0)
+            img.BackgroundTransparency = 1
+            img.Image                 = data.PortraitImage
+            img.ScaleType             = Enum.ScaleType.Crop
+            img.Parent                = sg
+
+            local nameBar = Instance.new("TextLabel")
+            nameBar.Size                  = UDim2.new(1, 0, 0.12, 0)
+            nameBar.Position              = UDim2.new(0, 0, 0.88, 0)
+            nameBar.BackgroundColor3      = Color3.fromRGB(12, 0, 18)
+            nameBar.BackgroundTransparency = 0.1
+            nameBar.Text                  = "⚡  " .. data.DisplayName .. "  ⚡"
+            nameBar.TextColor3            = Color3.fromRGB(255, 60, 80)
+            nameBar.TextScaled            = true
+            nameBar.Font                  = Enum.Font.GothamBold
+            nameBar.TextStrokeTransparency = 0.4
+            nameBar.Parent                = sg
+        end
+
+        -- Fire boss intro dialogue to all clients when the boss spawns
+        task.delay(0.8, function()
+            local lore = getLoreData()
+            local introLine = lore and data.LoreKey and lore.GetDialogueLine(data.LoreKey, "Intro")
+            if not BossPhaseEvt then
+                local re = ReplicatedStorage:FindFirstChild("RemoteEvents")
+                BossPhaseEvt = re and re:FindFirstChild("BossPhase")
+            end
+            if BossPhaseEvt and introLine then
+                BossPhaseEvt:FireAllClients({
+                    BossName     = data.DisplayName,
+                    Phase        = 0,  -- 0 = intro
+                    BossDialogue = introLine,
+                    EnemyId      = uniqueId,
+                })
+            end
+        end)
     end
 
     -- Special enemy attributes

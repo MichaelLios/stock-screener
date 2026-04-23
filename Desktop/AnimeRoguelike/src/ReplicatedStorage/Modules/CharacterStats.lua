@@ -1,13 +1,19 @@
 -- CharacterStats.lua
--- Manages player base stats and scaling. Anime-style power system.
+-- Manages player base stats, archetypes, and Origin integration.
+--
+-- Archetypes define the mechanical role (stat block, ability pool, passive).
+-- Origins (see OriginData.lua) define the identity within that role.
+-- BuildStats accepts an optional originId; it delegates to OriginData.ApplyOrigin.
 
 local CharacterStats = {}
 
--- Archetypes inspired by anime character roles
+-- Archetypes: the five paths of a Shard Diver
 CharacterStats.Archetypes = {
     Swordsman = {
-        DisplayName = "Swordsman",
-        Description = "A blade-focused warrior with high physical damage and mobility.",
+        DisplayName   = "Swordsman",
+        LoreTitle     = "Blade of the Shattered Line",
+        Description   = "A blade-focused warrior with high physical damage and mobility.",
+        LoreDesc      = "You fight with a weapon forged from Shard resonance. Every cut releases a fragment of the dying world it came from.",
         BaseHP = 120,
         BaseMP = 60,
         BaseAtk = 14,
@@ -26,8 +32,10 @@ CharacterStats.Archetypes = {
         Color = Color3.fromRGB(200, 50, 50),
     },
     Mage = {
-        DisplayName = "Mage",
-        Description = "A powerful caster that harnesses elemental and spiritual energy.",
+        DisplayName   = "Mage",
+        LoreTitle     = "Resonance Scholar",
+        Description   = "A powerful caster that harnesses elemental and spiritual energy.",
+        LoreDesc      = "You learned early that the Drift Shards are made of raw energy. You're simply better at reading the label.",
         BaseHP = 80,
         BaseMP = 140,
         BaseAtk = 18,
@@ -46,8 +54,10 @@ CharacterStats.Archetypes = {
         Color = Color3.fromRGB(80, 80, 220),
     },
     Brawler = {
-        DisplayName = "Brawler",
-        Description = "A tank fighter who hits hard and takes punishment.",
+        DisplayName   = "Brawler",
+        LoreTitle     = "Iron Body",
+        Description   = "A tank fighter who hits hard and takes punishment.",
+        LoreDesc      = "You walked into your first Shard and got hit so hard the Shard noticed. You got up. That made the difference.",
         BaseHP = 160,
         BaseMP = 40,
         BaseAtk = 12,
@@ -66,8 +76,10 @@ CharacterStats.Archetypes = {
         Color = Color3.fromRGB(220, 140, 40),
     },
     Assassin = {
-        DisplayName = "Assassin",
-        Description = "A swift shadow-arts user. Kills fast, dies fast.",
+        DisplayName   = "Assassin",
+        LoreTitle     = "Shadow of the Void",
+        Description   = "A swift shadow-arts user. Kills fast, dies fast.",
+        LoreDesc      = "You don't fight the Shards. You move through them like water through cracks — and leave nothing standing behind you.",
         BaseHP = 90,
         BaseMP = 80,
         BaseAtk = 16,
@@ -86,8 +98,10 @@ CharacterStats.Archetypes = {
         Color = Color3.fromRGB(80, 20, 80),
     },
     SpiritUser = {
-        DisplayName = "Spirit User",
-        Description = "Channels spirit energy (reiatsu/chakra) for devastating techniques.",
+        DisplayName   = "Spirit User",
+        LoreTitle     = "Resonance Channeler",
+        Description   = "Channels spirit energy (reiatsu/chakra) for devastating techniques.",
+        LoreDesc      = "You hear the Shards like music. Every corrupted echo, every dying resonance — you channel it back out as something the Void didn't intend.",
         BaseHP = 100,
         BaseMP = 120,
         BaseAtk = 15,
@@ -98,7 +112,7 @@ CharacterStats.Archetypes = {
         AtkPerLevel = 3,
         DefPerLevel = 2,
         SpdPerLevel = 1,
-        StartingAbilities = { "SpiritBlast", "AuraWall", "BankaiFrenzy" },
+        StartingAbilities = { "SpiritBlast", "AuraWall", "SoulDrain" },
         AbilityPool = { "SoulDrain", "ChakraStrike", "HealingSpring", "UltimateKamehameha" },
         PassiveBonus = "SpiritSurge", -- abilities restore HP equal to 10% of damage dealt
         BaseCritChance = 0.10,
@@ -107,13 +121,15 @@ CharacterStats.Archetypes = {
     },
 }
 
--- Build a stat block for a player at a given level
-function CharacterStats.BuildStats(archetypeName, level)
+-- Build a stat block for a player at a given level.
+-- Optional originId applies the origin's passive trait on top of base stats.
+function CharacterStats.BuildStats(archetypeName, level, originId)
     local arch = CharacterStats.Archetypes[archetypeName]
     assert(arch, "Unknown archetype: " .. tostring(archetypeName))
     level = math.max(1, level)
     local lvl = level - 1
-    return {
+
+    local stats = {
         Archetype    = archetypeName,
         Level        = level,
         MaxHP        = arch.BaseHP + arch.HPPerLevel * lvl,
@@ -126,7 +142,19 @@ function CharacterStats.BuildStats(archetypeName, level)
         -- Combat feel stats (augmented by run upgrades at runtime)
         CritChance   = arch.BaseCritChance or 0.05,
         CritMult     = arch.BaseCritMult   or 1.8,
+        -- Origin (nil if no origin selected)
+        OriginId     = originId or nil,
+        -- Passive MP regen per second (10% of MaxMP)
+        MPRegen      = math.max(4, math.floor((arch.BaseMP + arch.MPPerLevel * lvl) * 0.10)),
     }
+
+    -- Apply origin passive on top of base stats if one was selected
+    if originId then
+        local OriginData = require(script.Parent.OriginData)
+        OriginData.ApplyOrigin(stats, originId)
+    end
+
+    return stats
 end
 
 -- XP needed to reach next level (scales exponentially)
