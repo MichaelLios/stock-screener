@@ -1,0 +1,10 @@
+# SQLite database and WAL files
+*.db
+*.db-shm
+*.db-wal
+
+# Trained ML model
+nqb_model.pkl
+
+# Environment / secrets
+.env
